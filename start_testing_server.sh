@@ -1,3 +1,3 @@
 #!/bin/bash
-cd vendor/tendermint-test
+cd third_party/tendermint-test
 go run ./server.go

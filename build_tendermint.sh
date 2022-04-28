@@ -1,4 +1,4 @@
 #!/bin/bash
 mkdir -p build/
-cd vendor/tendermint-pct-instrumentation
+cd third_party/tendermint-pct-instrumentation
 go build -o ../../build/ ./cmd/tendermint

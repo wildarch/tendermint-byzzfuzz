@@ -17,6 +17,10 @@ github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d h1:nalkkPQ
 github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d/go.mod h1:URdX5+vg25ts3aCh8H5IFZybJYKWhJHYMTnf+ULtoC4=
 github.com/DataDog/zstd v1.4.1 h1:3oxKN3wbHibqx897utPC2LTQU4J+IHWWJO+glkAkpFM=
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
+github.com/ImperiumProject/imperium v0.1.4 h1:ss5YUPABPMDt+ak0kPb1Il3DqzJw+zrs6bkkgmO4elk=
+github.com/ImperiumProject/imperium v0.1.4/go.mod h1:9wMsvUUlUW5kz5V5q4hMqbWYpohOb9dBaFABZYH28H4=
+github.com/ImperiumProject/tendermint-test v0.0.0-20220126085010-89de7d0d2208 h1:QKazkVomDrJboNRK7/sLw51t93uuUGUFz1/g1xxJNas=
+github.com/ImperiumProject/tendermint-test v0.0.0-20220126085010-89de7d0d2208/go.mod h1:emnSFI9+84NDvHhqYQesrXF6NGcYvR26PBQMZF5Dkoc=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=

@@ -1,10 +1,10 @@
-module github.com/wildarch/byzzfuzz
+module byzzfuzz
 
-go 1.17
+go 1.18
 
 require (
-	github.com/ImperiumProject/imperium v0.1.4
-	github.com/ImperiumProject/tendermint-test v0.0.0-20220126085010-89de7d0d2208
+	github.com/netrixframework/netrix v0.1.1
+	github.com/netrixframework/tendermint-testing v0.0.0-20220509080244-35e07a2a96ea
 )
 
 require (

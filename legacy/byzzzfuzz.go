@@ -26,7 +26,7 @@ func LegacyMain() {
 	doneCh := make(chan bool, 1)
 
 	sysParams := common.NewSystemParams(4)
-	random := rand.New(rand.NewSource(42))
+	random := rand.New(rand.NewSource(43))
 	corruptions := 5
 	networkFaults := 10
 	rounds := 5
@@ -70,6 +70,7 @@ func LegacyMain() {
 	go func() {
 		select {
 		case <-termCh:
+			server.Stop()
 		case <-doneCh:
 			server.Stop()
 		}
@@ -78,6 +79,7 @@ func LegacyMain() {
 	server.Start()
 	// Returns once the server has been stopped
 
+	log.Printf("Stopping nodes...")
 	dockerCompose.Process.Signal(syscall.SIGTERM)
 	dockerCompose.Wait()
 
@@ -93,6 +95,7 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 		common.DiffCommits(),
 		testlib.FailStateLabel,
 	)
+	// TODO: Check if we expect consensus to be possible based on number of network faults
 	maxHeightReached.On(
 		common.IsCommit(),
 		testlib.SuccessStateLabel,
@@ -136,7 +139,27 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 
 func dropMessageLoudly() testlib.Action {
 	return func(e *types.Event, c *testlib.Context) []*types.Message {
-		log.Printf("Dropping message!")
+		message, ok := util.GetMessageFromEvent(e, c)
+		if ok {
+			from := -1
+			to := -1
+			for i, r := range c.Replicas.Iter() {
+				if r.ID == message.From {
+					from = i
+				}
+				if r.ID == message.To {
+					to = i
+				}
+			}
+			roundsTillLastCommit, ok := c.Vars.GetInt(roundKey)
+			if !ok {
+				roundsTillLastCommit = 0
+			}
+			globalRound := roundsTillLastCommit + message.Round()
+			log.Printf("Dropping message (from=%d, to=%d, round=%d)", from, to, globalRound)
+		} else {
+			log.Printf("Dropping message!")
+		}
 		return []*types.Message{}
 	}
 }
@@ -166,6 +189,9 @@ func isMessageFromGlobalRound(round int) testlib.Condition {
 	return func(e *types.Event, c *testlib.Context) bool {
 		m, ok := util.GetMessageFromEvent(e, c)
 		if !ok {
+			return false
+		}
+		if m.Round() < 0 {
 			return false
 		}
 		roundsTillLastCommit, ok := c.Vars.GetInt(roundKey)

@@ -19,3 +19,11 @@ curl -Lo $ZIPFILE https://github.com/netrixframework/tendermint-testing/archive/
 unzip $ZIPFILE
 rm -f $ZIPFILE
 mv tendermint-testing-* tendermint-testing/
+
+# tendermint-test
+ZIPFILE=tendermint-test.zip
+rm -rf tendermint-test/ $ZIPFILE 
+curl -Lo $ZIPFILE https://github.com/ImperiumProject/tendermint-test/archive/89de7d0d2208568d5e70d42b4d85986c669b4df4.zip
+unzip $ZIPFILE
+rm -f $ZIPFILE
+mv tendermint-test-* tendermint-test/

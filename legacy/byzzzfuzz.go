@@ -1,6 +1,7 @@
 package legacy
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
@@ -104,6 +105,7 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 	cascade := testlib.NewHandlerCascade()
 	cascade.AddHandler(trackGlobalRound)
 
+	// Samples drops
 	for i := 0; i < networkFaults; i++ {
 		round := random.Intn(rounds)
 		from := random.Intn(sp.N)
@@ -117,6 +119,25 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 					And(isMessageFrom(from)).
 					And(isMessageTo(to)),
 			).Then(dropMessageLoudly()),
+		)
+	}
+
+	// Sample corruptions.
+	for i := 0; i < corruptions; i++ {
+		round := random.Intn(rounds)
+		// Random subset of replica indices
+		// TODO: Check if this is correct
+		procs := random.Perm(sp.N)[0:random.Intn(sp.N)]
+		corRandom := rand.New(rand.NewSource(random.Int63()))
+
+		cascade.AddHandler(
+			testlib.If(testlib.IsMessageSend().
+				And(isMessageFromGlobalRound(round)).
+				And(common.IsMessageFromPart("faulty")).
+				And(IsMessageToOneOf(procs)),
+			).Then(
+				corruptMessage(corRandom),
+			),
 		)
 	}
 
@@ -134,7 +155,123 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 		}
 	}()
 	return testcase
+}
 
+func corruptMessage(random *rand.Rand) testlib.Action {
+	return func(e *types.Event, c *testlib.Context) []*types.Message {
+		m, ok := c.GetMessage(e)
+		if !ok {
+			return []*types.Message{}
+		}
+		tMsg, ok := util.GetParsedMessage(m)
+		if !ok {
+			return []*types.Message{m}
+		}
+
+		// Debugging
+		from := -1
+		to := -1
+		for i, r := range c.Replicas.Iter() {
+			if r.ID == tMsg.From {
+				from = i
+			}
+			if r.ID == tMsg.To {
+				to = i
+			}
+		}
+		roundsTillLastCommit, ok := c.Vars.GetInt(roundKey)
+		if !ok {
+			roundsTillLastCommit = 0
+		}
+		globalRound := roundsTillLastCommit + tMsg.Round()
+		log.Printf("Corrupting message (from=%d, to=%d, round=%d)", from, to, globalRound)
+
+		switch tMsg.Type {
+		case util.Proposal:
+			// TODO:
+			// - ChangeProposalLockValue (TODO?)
+			actions := [1]testlib.Action{
+				changeProposalToNil,
+			}
+			return actions[random.Intn(len(actions))](e, c)
+		case util.Precommit:
+			fallthrough
+		case util.Prevote:
+			// TODO:
+			// - ChangeVoteToProposalMessage (see relocked)
+			// - ChangeVoteTime
+			actions := [2]testlib.Action{
+				common.ChangeVoteToNil(),
+				changeVoteRound(),
+			}
+			return actions[random.Intn(len(actions))](e, c)
+		default:
+			return []*types.Message{m}
+		}
+	}
+}
+
+func changeVoteRound() testlib.Action {
+	return func(e *types.Event, c *testlib.Context) []*types.Message {
+		m, ok := c.GetMessage(e)
+		if !ok {
+			return []*types.Message{}
+		}
+		tMsg, ok := util.GetParsedMessage(m)
+		if !ok {
+			return []*types.Message{m}
+		}
+		if tMsg.Type != util.Precommit && tMsg.Type != util.Prevote {
+			return []*types.Message{}
+		}
+		valAddr, ok := util.GetVoteValidator(tMsg)
+		if !ok {
+			return []*types.Message{}
+		}
+		var replica *types.Replica = nil
+		for _, r := range c.Replicas.Iter() {
+			addr, err := util.GetReplicaAddress(r)
+			if err != nil {
+				continue
+			}
+			if bytes.Equal(addr, valAddr) {
+				replica = r
+				break
+			}
+		}
+		if replica == nil {
+			return []*types.Message{}
+		}
+		newVote, err := util.ChangeVoteRound(replica, tMsg, int32(tMsg.Round()+2))
+		if err != nil {
+			return []*types.Message{}
+		}
+		msgB, err := newVote.Marshal()
+		if err != nil {
+			return []*types.Message{}
+		}
+		return []*types.Message{c.NewMessage(m, msgB)}
+	}
+}
+
+func changeProposalToNil(e *types.Event, c *testlib.Context) []*types.Message {
+	message, _ := c.GetMessage(e)
+	tMsg, ok := util.GetParsedMessage(message)
+	if !ok {
+		return []*types.Message{}
+	}
+	replica, _ := c.Replicas.Get(tMsg.From)
+	newProp, err := util.ChangeProposalBlockIDToNil(replica, tMsg)
+	if err != nil {
+		//c.Logger().With(log.LogParams{"error": err}).Error("Failed to change proposal")
+		return []*types.Message{message}
+	}
+	newMsgB, err := newProp.Marshal()
+	if err != nil {
+		//c.Logger().With(log.LogParams{"error": err}).Error("Failed to marshal changed proposal")
+		return []*types.Message{message}
+	}
+	return []*types.Message{c.NewMessage(message, newMsgB)}
 }
 
 func dropMessageLoudly() testlib.Action {
@@ -182,6 +319,21 @@ func isMessageTo(replicaIdx int) testlib.Condition {
 			return false
 		}
 		return message.To == ctx.Replicas.Iter()[replicaIdx].ID
+	}
+}
+
+func IsMessageToOneOf(replicaIdxs []int) testlib.Condition {
+	return func(e *types.Event, ctx *testlib.Context) bool {
+		message, ok := ctx.GetMessage(e)
+		if !ok {
+			return false
+		}
+		for replicaIdx := range replicaIdxs {
+			if message.To == ctx.Replicas.Iter()[replicaIdx].ID {
+				return true
+			}
+		}
+		return false
 	}
 }
 

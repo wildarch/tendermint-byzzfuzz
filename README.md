@@ -28,6 +28,9 @@ cd third_party/tendermint-testing
 go run ./server.go
 ```
 
+If you see errors about failing to bind to the address, it is possible the bridge address has not yet been created.
+In this case you can start the nodes first one time (see below) and stop them with Ctrl-C once they have started. This should create the bridge.
+
 **The server must start before the nodes, or the nodes will not connect to the server.**
 
 Now start nodes:
@@ -41,10 +44,10 @@ You in the testing server logs you should start to see JSON messages. Look for `
 If you see permission errors when starting the network for the second time change this in `third_party/tendermint-pct-instrumentation/Makefile`:
 
 ```diff
-  # Stop testnet
-  localnet-stop:
- 	docker-compose down
-- 	rm -rf $(BUILDDIR)/node*
-+ 	sudo rm -rf $(BUILDDIR)/node*
-  .PHONY: localnet-stop
+    # Stop testnet
+    localnet-stop:
+    docker-compose down
+-   rm -rf $(BUILDDIR)/node*
++   docker run --rm -v $(BUILDDIR):/tendermint alpine rm -rf /tendermint/node{0,1,2,3}
+    .PHONY: localnet-stop
 ```

@@ -130,6 +130,7 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 		procs := random.Perm(sp.N)[0:random.Intn(sp.N)]
 		corRandom := rand.New(rand.NewSource(random.Int63()))
 
+		log.Printf("Will corrupt messages (from=faulty, to=%v, round=%d, seed=%v)", procs, round, corRandom)
 		cascade.AddHandler(
 			testlib.If(testlib.IsMessageSend().
 				And(isMessageFromGlobalRound(round)).

@@ -51,3 +51,9 @@ If you see permission errors when starting the network for the second time chang
 +   docker run --rm -v $(BUILDDIR):/tendermint alpine rm -rf /tendermint/node{0,1,2,3}
     .PHONY: localnet-stop
 ```
+
+
+# To add to docs
+https://docs.docker.com/network/bridge/#enable-forwarding-from-docker-containers-to-the-outside-world
+
+docker-compose up --no-start

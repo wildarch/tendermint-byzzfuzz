@@ -39,7 +39,7 @@ cd third_party/tendermint-pct-instrumentation
 make localnet-start
 ```
 
-You in the testing server logs you should start to see JSON messages. Look for `Starting testcase`, and eventually ou should see `Testcase succeeded`.
+In the testing server logs you should start to see JSON messages. Look for `Starting testcase`, and eventually you should see `Testcase succeeded`.
 
 If you see permission errors when starting the network for the second time change this in `third_party/tendermint-pct-instrumentation/Makefile`:
 

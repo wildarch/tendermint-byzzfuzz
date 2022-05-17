@@ -15,7 +15,7 @@ rm -f $ZIPFILE
 # tendermint-testing
 ZIPFILE=tendermint-testing.zip
 rm -rf tendermint-testing/ $ZIPFILE 
-curl -Lo $ZIPFILE https://github.com/netrixframework/tendermint-testing/archive/35e07a2a96ea42fc85fd16128fa5b83124d9804b.zip
+curl -Lo $ZIPFILE https://github.com/netrixframework/tendermint-testing/archive/ef12041869655577851f603aee1eb8a9b756f089.zip
 unzip $ZIPFILE
 rm -f $ZIPFILE
 mv tendermint-testing-* tendermint-testing/

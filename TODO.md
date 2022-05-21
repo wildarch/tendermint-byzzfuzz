@@ -1,5 +1,2 @@
-- Test global round tracking 
-- Tracking height/round of peers
-- Spec checker for move to higher round
-- Replicate ExpectNewRound
-- Random test generator
+- Tracking height/round of peers (untested)
+- Spec checker for move to higher round (appears broken)

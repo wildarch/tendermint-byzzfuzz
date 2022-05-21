@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/testlib"
 	"github.com/netrixframework/netrix/types"
 )
@@ -37,7 +38,7 @@ func trackTotalRounds(e *types.Event, c *testlib.Context) (messages []*types.Mes
 	// Retrieve previous values
 	prevHeight, ok := c.Vars.GetInt(prevHeightKey(e.Replica))
 	if !ok {
-		prevHeight = 0
+		prevHeight = 1
 	}
 	prevRound, ok := c.Vars.GetInt(prevRoundKey(e.Replica))
 	if !ok {
@@ -58,7 +59,11 @@ func trackTotalRounds(e *types.Event, c *testlib.Context) (messages []*types.Mes
 	}
 
 	if totalRounds != oldTotalRounds {
-		c.Logger().Info(fmt.Sprintf("Total rounds: %d (H=%d/R=%d)", totalRounds, height, round))
+		c.Logger().With(log.LogParams{
+			"totalRounds": totalRounds,
+			"height":      height,
+			"round":       round,
+		}).Debug("Updated total rounds")
 	}
 
 	c.Vars.Set(prevHeightKey(e.Replica), height)

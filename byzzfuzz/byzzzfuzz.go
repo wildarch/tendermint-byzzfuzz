@@ -1,184 +1,97 @@
 package byzzfuzz
 
 import (
+	"encoding/json"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/netrixframework/netrix/testlib"
-	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/tendermint-testing/common"
-	"github.com/netrixframework/tendermint-testing/util"
 )
 
-const maxHeight = 3
-
 func ByzzFuzzExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
-	// TODO: We should fix the fault node idx
 	isolatedValidator := 0
+	faulty := 1
 
 	drops := []MessageDrop{
 		// ROUND 0
 		// Drops everything from isolatedValidator
-		{round: 0, from: isolatedValidator, to: 0},
-		{round: 0, from: isolatedValidator, to: 1},
-		{round: 0, from: isolatedValidator, to: 2},
-		{round: 0, from: isolatedValidator, to: 3},
+		{Round: 0, From: isolatedValidator, To: 0},
+		{Round: 0, From: isolatedValidator, To: 1},
+		{Round: 0, From: isolatedValidator, To: 2},
+		{Round: 0, From: isolatedValidator, To: 3},
 		// Drops everything to isolatedValidator
-		{round: 0, from: 0, to: isolatedValidator},
-		{round: 0, from: 1, to: isolatedValidator},
-		{round: 0, from: 2, to: isolatedValidator},
-		{round: 0, from: 3, to: isolatedValidator},
+		{Round: 0, From: 0, To: isolatedValidator},
+		{Round: 0, From: 1, To: isolatedValidator},
+		{Round: 0, From: 2, To: isolatedValidator},
+		{Round: 0, From: 3, To: isolatedValidator},
 	}
 
 	allNodes := []int{0, 1, 2, 3}
 	corruptions := []MessageCorruption{
-		{round: 0, to: &allNodes, corruption: ChangeVoteToNil},
-		{round: 1, to: &allNodes, corruption: ChangeVoteToNil},
+		{Round: 0, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Round: 1, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 	}
 
-	return ByzzFuzzInst(sp, drops, corruptions)
+	return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
 }
 
-func dropMessageLoudly() testlib.Action {
-	return func(e *types.Event, c *testlib.Context) []*types.Message {
-		message, ok := util.GetMessageFromEvent(e, c)
-		if ok {
-			from := -1
-			to := -1
-			for i, r := range c.Replicas.Iter() {
-				if r.ID == message.From {
-					from = i
-				}
-				if r.ID == message.To {
-					to = i
-				}
-			}
-			totalRounds, ok := c.Vars.GetInt(totalRoundsKey(e.Replica))
-			if !ok {
-				totalRounds = 0
-			}
-			log.Printf("Dropping message (from=%d, to=%d, round=%d)", from, to, totalRounds)
-		} else {
-			log.Printf("Dropping message!")
-		}
-		return []*types.Message{}
+type ByzzFuzzInstanceConfig struct {
+	sysParams   *common.SystemParams
+	Drops       []MessageDrop       `json:"drops"`
+	Corruptions []MessageCorruption `json:"corruptions"`
+	Timeout     time.Duration       `json:"timeout"`
+}
+
+func (c *ByzzFuzzInstanceConfig) TestCase() *testlib.TestCase {
+	return ByzzFuzzInst(c.sysParams, c.Drops, c.Corruptions, c.Timeout)
+}
+
+func (c *ByzzFuzzInstanceConfig) Json() string {
+	json, err := json.Marshal(c)
+	if err != nil {
+		log.Fatal(err)
 	}
+	return string(json)
 }
 
-// TODO: Use ReplicaIDs
-func isMessageFrom(replicaIdx int) testlib.Condition {
-	return func(e *types.Event, ctx *testlib.Context) bool {
-		message, ok := ctx.GetMessage(e)
-		if !ok {
-			return false
+func ByzzFuzzRandom(sp *common.SystemParams,
+	r *rand.Rand,
+	maxDrops int,
+	maxCorruptions int,
+	maxRounds int,
+	timeout time.Duration) ByzzFuzzInstanceConfig {
+
+	nDrops := rand.Intn(maxDrops)
+	drops := make([]MessageDrop, nDrops)
+	for i, _ := range drops {
+		drops[i] = MessageDrop{
+			Round: rand.Intn(maxRounds),
+			From:  rand.Intn(sp.N),
+			To:    rand.Intn(sp.N),
 		}
-		return message.From == ctx.Replicas.Iter()[replicaIdx].ID
 	}
-}
 
-func isMessageTo(replicaIdx int) testlib.Condition {
-	return func(e *types.Event, ctx *testlib.Context) bool {
-		message, ok := ctx.GetMessage(e)
-		if !ok {
-			return false
+	byzantineNode := rand.Intn(sp.N)
+	nCorruptions := rand.Intn(maxCorruptions)
+	corruptions := make([]MessageCorruption, nCorruptions)
+	for i, _ := range corruptions {
+		corruptions[i] = MessageCorruption{
+			Round:      rand.Intn(maxRounds),
+			From:       byzantineNode,
+			To:         randomSubset(r, sp.N),
+			Corruption: randomCorruption(r),
 		}
-		return message.To == ctx.Replicas.Iter()[replicaIdx].ID
 	}
+
+	return ByzzFuzzInstanceConfig{sp, drops, corruptions, timeout}
 }
 
-func IsMessageToOneOf(replicaIdxs []int) testlib.Condition {
-	return func(e *types.Event, ctx *testlib.Context) bool {
-		message, ok := ctx.GetMessage(e)
-		if !ok {
-			return false
-		}
-		for replicaIdx := range replicaIdxs {
-			if message.To == ctx.Replicas.Iter()[replicaIdx].ID {
-				return true
-			}
-		}
-		return false
-	}
+func randomSubset(r *rand.Rand, n int) []int {
+	return r.Perm(n)[0:r.Intn(n)]
 }
 
-func expectNewRound(sp *common.SystemParams) *testlib.TestCase {
-	sm := testlib.NewStateMachine()
-	init := sm.Builder()
-	// We want replicas in partition "h" to move to round 1
-	init.On(
-		common.IsNewHeightRoundFromPart("h", 1, 1),
-		testlib.SuccessStateLabel,
-	)
-	newRound := init.On(
-		testlib.Count("round1ToH").Geq(sp.F+1),
-		"newRoundMessagesDelivered",
-	).On(
-		common.IsNewHeightRoundFromPart("h", 1, 1),
-		"NewRound",
-	)
-	newRound.On(
-		common.DiffCommits(),
-		testlib.FailStateLabel,
-	)
-	newRound.On(
-		common.IsCommit(),
-		testlib.SuccessStateLabel,
-	)
-
-	init.On(
-		common.IsCommit(),
-		testlib.FailStateLabel,
-	)
-
-	filters := testlib.NewFilterSet()
-	filters.AddFilter(
-		testlib.If(
-			testlib.IsMessageSend().
-				And(common.IsVoteFromFaulty()),
-		).Then(
-			common.ChangeVoteToNil(),
-		),
-	)
-	filters.AddFilter(
-		testlib.If(
-			testlib.IsMessageReceive().
-				And(common.IsMessageFromRound(1)).
-				And(common.IsMessageToPart("h")).
-				And(
-					common.IsMessageType(util.Proposal).
-						Or(common.IsMessageType(util.Prevote)).
-						Or(common.IsMessageType(util.Precommit)),
-				),
-		).Then(
-			testlib.Count("round1ToH").Incr(),
-		),
-	)
-	filters.AddFilter(
-		testlib.If(
-			testlib.IsMessageSend().
-				And(common.IsMessageFromRound(0)).
-				And(common.IsMessageToPart("h")).
-				And(common.IsMessageType(util.Prevote).Or(common.IsMessageType(util.Precommit))),
-		).Then(
-			testlib.DropMessage(),
-		),
-	)
-	filters.AddFilter(
-		testlib.If(
-			testlib.IsMessageSend().
-				And(common.IsMessageFromRound(0)).
-				And(common.IsVoteFromPart("h")),
-		).Then(
-			testlib.DropMessage(),
-		),
-	)
-
-	testcase := testlib.NewTestCase(
-		"ExpectNewRound",
-		1*time.Minute,
-		sm,
-		filters,
-	)
-	testcase.SetupFunc(common.Setup(sp))
-	return testcase
+func randomCorruption(r *rand.Rand) CorruptionType {
+	return CorruptionTypes[r.Intn(len(CorruptionTypes))]
 }

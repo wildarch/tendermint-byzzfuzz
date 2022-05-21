@@ -1,6 +1,7 @@
 package main
 
 import (
+	"byzzfuzz/netrix"
 	"fmt"
 	"log"
 	"os"
@@ -22,8 +23,8 @@ import (
 
 func main() {
 	//legacy.LegacyMain()
-	//netrix.Main()
-	runUnitTests()
+	netrix.Main()
+	//runUnitTests()
 }
 
 func runUnitTests() {

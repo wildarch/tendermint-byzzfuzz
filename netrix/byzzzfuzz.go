@@ -23,13 +23,13 @@ func Main() {
 	termCh := make(chan os.Signal, 1)
 	signal.Notify(termCh, os.Interrupt, syscall.SIGTERM)
 
-	doneCh := make(chan bool, 1)
-
 	sysParams := common.NewSystemParams(4)
-	random := rand.New(rand.NewSource(43))
-	corruptions := 5
-	networkFaults := 10
-	rounds := 5
+	/*
+		random := rand.New(rand.NewSource(43))
+		corruptions := 5
+		networkFaults := 10
+		rounds := 5
+	*/
 
 	server, err := testlib.NewTestingServer(
 		&config.Config{
@@ -42,7 +42,8 @@ func Main() {
 		},
 		&util.TMessageParser{},
 		[]*testlib.TestCase{
-			ByzzFuzz(sysParams, random, corruptions, networkFaults, rounds, doneCh),
+			// ByzzFuzz(sysParams, random, corruptions, networkFaults, rounds, doneCh),
+			byzzFuzzExpectNewRound(sysParams),
 		},
 	)
 
@@ -50,6 +51,8 @@ func Main() {
 		fmt.Printf("Failed to start server: %s\n", err.Error())
 		os.Exit(1)
 	}
+
+	prepDockerCompose()
 
 	// Stdout to file
 	dockerCompose := exec.Command("make", "localnet-start")
@@ -71,6 +74,7 @@ func Main() {
 		}
 	}()
 
+	doneCh := server.Done()
 	go func() {
 		select {
 		case <-termCh:
@@ -89,9 +93,25 @@ func Main() {
 
 }
 
+func prepDockerCompose() {
+	localNetStop := exec.Command("make", "localnet-stop")
+	localNetStop.Dir = "third_party/tendermint-pct-instrumentation"
+	err := localNetStop.Run()
+	if err != nil {
+		log.Fatalf("Failed to stop previous local net: %v", err)
+	}
+
+	dockerComposeUpNoStart := exec.Command("docker-compose", "up", "--no-start")
+	dockerComposeUpNoStart.Dir = "third_party/tendermint-pct-instrumentation"
+	err = dockerComposeUpNoStart.Run()
+	if err != nil {
+		log.Fatalf("Failed to prepare network: %v", err)
+	}
+}
+
 const maxHeight = 3
 
-func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, networkFaults int, rounds int, doneChan chan bool) *testlib.TestCase {
+func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, networkFaults int, rounds int) *testlib.TestCase {
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
 	maxHeightReached := init.On(common.HeightReached(maxHeight), "maxHeightReached")
@@ -148,17 +168,163 @@ func ByzzFuzz(sp *common.SystemParams, random *rand.Rand, corruptions int, netwo
 	testcase := testlib.NewTestCase("ByzzFuzz", 2*time.Minute, sm, cascade)
 	testcase.SetupFunc(common.Setup(sp))
 
-	// Send done signal once test is in success state
-	go func() {
-		for {
-			time.Sleep(100 * time.Millisecond)
-			if sm.InSuccessState() {
-				doneChan <- true
-				return
-			}
-		}
-	}()
 	return testcase
+}
+
+func byzzFuzzExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
+	// TODO: We should fix the fault node idx
+	isolatedValidator := 0
+
+	drops := []messageDrop{
+		// ROUND 0
+		// Drops everything from isolatedValidator
+		{round: 0, from: isolatedValidator, to: 0},
+		{round: 0, from: isolatedValidator, to: 1},
+		{round: 0, from: isolatedValidator, to: 2},
+		{round: 0, from: isolatedValidator, to: 3},
+		// Drops everything to isolatedValidator
+		{round: 0, from: 0, to: isolatedValidator},
+		{round: 0, from: 1, to: isolatedValidator},
+		{round: 0, from: 2, to: isolatedValidator},
+		{round: 0, from: 3, to: isolatedValidator},
+	}
+
+	allNodes := []int{0, 1, 2, 3}
+	corruptions := []messageCorruption{
+		{round: 0, to: &allNodes, corruption: ChangeVoteToNil},
+		{round: 1, to: &allNodes, corruption: ChangeVoteToNil},
+	}
+
+	return ByzzFuzzInst(sp, drops, corruptions)
+}
+
+type messageDrop struct {
+	round int
+	from  int
+	to    int
+}
+
+type messageCorruption struct {
+	round      int
+	to         *[]int
+	corruption CorruptionType
+}
+
+type CorruptionType int
+
+const (
+	ChangeProposalToNil CorruptionType = iota
+	ChangeVoteToNil
+	ChangeVoteRound
+)
+
+// spec checker
+// - Record highest round number received from each node, per node.
+
+type heightRound struct {
+	height int
+	round  int
+}
+
+type highestRoundReceived struct {
+	from map[types.ReplicaID]heightRound
+}
+
+func (hrr *highestRoundReceived) Update(from types.ReplicaID, new heightRound) {
+	hr, found := hrr.from[from]
+	if !found || hr.height < new.height || (hr.height == new.height && hr.round < new.round) {
+		hrr.from[from] = new
+	}
+}
+
+func highestRoundReceivedKey(id types.ReplicaID) string {
+	return fmt.Sprintf("BF_heighest_round_received_%s", id)
+}
+
+func recordHighestRoundNumberReceived() testlib.FilterFunc {
+	return func(e *types.Event, ctx *testlib.Context) ([]*types.Message, bool) {
+		message, ok := util.GetMessageFromEvent(e, ctx)
+		if !ok {
+			return nil, false
+		}
+		height, round := message.HeightRound()
+		if round < 0 {
+			return nil, false
+		}
+		hr := heightRound{height: height, round: round}
+		hrrR, found := ctx.Vars.Get(highestRoundReceivedKey(message.To))
+		if !found {
+			hrrR = highestRoundReceived{from: make(map[types.ReplicaID]heightRound)}
+		}
+		hrr := hrrR.(highestRoundReceived)
+		hrr.Update(message.From, hr)
+		ctx.Vars.Set(highestRoundReceivedKey(message.To), hrr)
+
+		return nil, false
+	}
+}
+
+func ByzzFuzzInst(sp *common.SystemParams, drops []messageDrop, corruptions []messageCorruption) *testlib.TestCase {
+	sm := testlib.NewStateMachine()
+	init := sm.Builder()
+	maxHeightReached := init.On(common.HeightReached(maxHeight), "maxHeightReached")
+	maxHeightReached.On(
+		common.DiffCommits(),
+		testlib.FailStateLabel,
+	)
+	// TODO: Check if we expect consensus to be possible based on number of network faults
+	maxHeightReached.On(
+		common.IsCommit(),
+		testlib.SuccessStateLabel,
+	)
+
+	cascade := testlib.NewFilterSet()
+	cascade.AddFilter(trackGlobalRound)
+	cascade.AddFilter(recordHighestRoundNumberReceived())
+
+	for i := range drops {
+		drop := drops[i]
+		cascade.AddFilter(
+			testlib.If(
+				testlib.IsMessageSend().
+					And(isMessageFromGlobalRound(drop.round)).
+					And(isMessageFrom(drop.from)).
+					And(isMessageTo(drop.to)),
+			).Then(dropMessageLoudly()),
+		)
+	}
+
+	for i := range corruptions {
+		corruption := corruptions[i]
+		action := actionForCorruption(corruption.corruption)
+
+		cascade.AddFilter(
+			testlib.If(testlib.IsMessageSend().
+				And(isMessageFromGlobalRound(corruption.round)).
+				And(common.IsMessageFromPart("faulty")).
+				And(IsMessageToOneOf(*corruption.to)),
+			).Then(action),
+		)
+
+	}
+
+	testcase := testlib.NewTestCase("ByzzFuzzInst", 2*time.Minute, sm, cascade)
+	testcase.SetupFunc(common.Setup(sp))
+
+	return testcase
+}
+
+func actionForCorruption(corruptionType CorruptionType) testlib.Action {
+	switch corruptionType {
+	case ChangeProposalToNil:
+		return changeProposalToNil
+	case ChangeVoteToNil:
+		return common.ChangeVoteToNil()
+	case ChangeVoteRound:
+		return changeVoteRound()
+	default:
+		panic("Invalid type of corruption")
+	}
 }
 
 func corruptMessage(random *rand.Rand) testlib.Action {
@@ -406,4 +572,86 @@ func trackGlobalRound(e *types.Event, c *testlib.Context) (messages []*types.Mes
 	log.Printf("New global round: %d (prevRound = %d, round = %d)", newRound, prevRound, round)
 	c.Vars.Set(roundKey, newRound)
 	return
+}
+
+func expectNewRound(sp *common.SystemParams) *testlib.TestCase {
+	sm := testlib.NewStateMachine()
+	init := sm.Builder()
+	// We want replicas in partition "h" to move to round 1
+	init.On(
+		common.IsNewHeightRoundFromPart("h", 1, 1),
+		testlib.SuccessStateLabel,
+	)
+	newRound := init.On(
+		testlib.Count("round1ToH").Geq(sp.F+1),
+		"newRoundMessagesDelivered",
+	).On(
+		common.IsNewHeightRoundFromPart("h", 1, 1),
+		"NewRound",
+	)
+	newRound.On(
+		common.DiffCommits(),
+		testlib.FailStateLabel,
+	)
+	newRound.On(
+		common.IsCommit(),
+		testlib.SuccessStateLabel,
+	)
+
+	init.On(
+		common.IsCommit(),
+		testlib.FailStateLabel,
+	)
+
+	filters := testlib.NewFilterSet()
+	filters.AddFilter(
+		testlib.If(
+			testlib.IsMessageSend().
+				And(common.IsVoteFromFaulty()),
+		).Then(
+			common.ChangeVoteToNil(),
+		),
+	)
+	filters.AddFilter(
+		testlib.If(
+			testlib.IsMessageReceive().
+				And(common.IsMessageFromRound(1)).
+				And(common.IsMessageToPart("h")).
+				And(
+					common.IsMessageType(util.Proposal).
+						Or(common.IsMessageType(util.Prevote)).
+						Or(common.IsMessageType(util.Precommit)),
+				),
+		).Then(
+			testlib.Count("round1ToH").Incr(),
+		),
+	)
+	filters.AddFilter(
+		testlib.If(
+			testlib.IsMessageSend().
+				And(common.IsMessageFromRound(0)).
+				And(common.IsMessageToPart("h")).
+				And(common.IsMessageType(util.Prevote).Or(common.IsMessageType(util.Precommit))),
+		).Then(
+			testlib.DropMessage(),
+		),
+	)
+	filters.AddFilter(
+		testlib.If(
+			testlib.IsMessageSend().
+				And(common.IsMessageFromRound(0)).
+				And(common.IsVoteFromPart("h")),
+		).Then(
+			testlib.DropMessage(),
+		),
+	)
+
+	testcase := testlib.NewTestCase(
+		"ExpectNewRound",
+		1*time.Minute,
+		sm,
+		filters,
+	)
+	testcase.SetupFunc(common.Setup(sp))
+	return testcase
 }

@@ -35,7 +35,7 @@ func RecordHighestRoundNumberReceived(e *types.Event, ctx *testlib.Context) (mes
 			"from":    message.From,
 			"height":  height,
 			"round":   round,
-		}).Info("Update highest round")
+		}).Debug("Update highest round")
 
 		ctx.Vars.Set(highestRoundReceivedKey(e.Replica), hrr)
 	}
@@ -115,7 +115,16 @@ func SendsMessageWithTooLowRound(e *types.Event, c *testlib.Context) bool {
 		"highest_round_received": fmt.Sprint(hrr),
 		"height":                 height,
 		"round":                  round,
-	}).Info("checking message round is not too low")
+	}).Debug("checking message round is not too low")
 
-	return hrr.HasHigherMajority(faults, height, round)
+	if hrr.HasHigherMajority(faults, height, round) {
+		c.Logger().With(log.LogParams{
+			"height":                 height,
+			"round":                  round,
+			"highest_round_received": fmt.Sprint(hrr),
+		}).Error("Found message with too low height/round")
+		return true
+	} else {
+		return false
+	}
 }

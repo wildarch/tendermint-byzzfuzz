@@ -22,9 +22,6 @@ import (
 
 var serverBindIp = flag.String("bind-ip", "192.167.0.1", "IP address to bind the testing server on. Should match controller-master-addr in node configuration.")
 
-var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
-var fuzzCmd = flag.NewFlagSet("fuzz", flag.ExitOnError)
-
 const (
 	// Main parameters for ByzzFuzz algorithm
 	defaultMaxDrops       = 10
@@ -32,10 +29,14 @@ const (
 	defaultMaxRounds      = 5
 )
 
+var fuzzCmd = flag.NewFlagSet("fuzz", flag.ExitOnError)
 var maxDrops = fuzzCmd.Int("max-drops", defaultMaxDrops, "Bound on the number of network link faults")
 var maxCorruptions = fuzzCmd.Int("max-corruptions", defaultMaxCorruptions, "Bound on the number of message corruptions")
 var maxRounds = fuzzCmd.Int("max-rounds", defaultMaxRounds, "Bound on the number of protocol rounds")
 var timeout = fuzzCmd.Duration("timeout", 2*time.Minute, "Timeout per test instance")
+
+var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
+var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on ByzzFuzz instance")
 
 var sysParams = common.NewSystemParams(4)
 
@@ -53,13 +54,15 @@ func main() {
 		fmt.Println("expected 'unittest' or 'fuzz' subcommands")
 		os.Exit(1)
 	}
-	testcase := byzzfuzz.ByzzFuzzExpectNewRound(sysParams)
-	runSingleTestCase(sysParams, testcase)
 }
 
 func unittest() {
 	unittestCmd.Parse(os.Args[2:])
-	runSingleTestCase(sysParams, rskip.ExpectNewRound(sysParams))
+	if *useByzzfuzz {
+		runSingleTestCase(sysParams, byzzfuzz.ByzzFuzzExpectNewRound(sysParams))
+	} else {
+		runSingleTestCase(sysParams, rskip.ExpectNewRound(sysParams))
+	}
 }
 
 func fuzz() {
@@ -138,8 +141,4 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 	dockerCompose.Wait()
 
 	return terminate
-}
-
-func expectNewRound(sp *common.SystemParams) testlib.TestCase {
-	return *rskip.ExpectNewRound(sp)
 }

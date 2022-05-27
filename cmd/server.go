@@ -28,13 +28,13 @@ const (
 	// Main parameters for ByzzFuzz algorithm
 	defaultMaxDrops       = 3
 	defaultMaxCorruptions = 5
-	defaultMaxRounds      = 5
+	defaultMaxSteps       = 10
 )
 
 var fuzzCmd = flag.NewFlagSet("fuzz", flag.ExitOnError)
 var maxDrops = fuzzCmd.Int("max-drops", defaultMaxDrops, "Bound on the number of network link faults")
 var maxCorruptions = fuzzCmd.Int("max-corruptions", defaultMaxCorruptions, "Bound on the number of message corruptions")
-var maxRounds = fuzzCmd.Int("max-rounds", defaultMaxRounds, "Bound on the number of protocol rounds")
+var maxSteps = fuzzCmd.Int("max-steps", defaultMaxSteps, "Bound on the number of protocol consensus steps")
 var timeout = fuzzCmd.Duration("timeout", 2*time.Minute, "Timeout per test instance")
 
 var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
@@ -79,11 +79,16 @@ func fuzz(args []string) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for {
-		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxRounds, *timeout)
+		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxSteps, *timeout)
 		log.Printf("Running test instance: %s", instance.Json())
 		testcase := instance.TestCase()
 		if runSingleTestCase(sysParams, testcase) {
 			break
+		}
+		if testcase.StateMachine.InSuccessState() {
+			log.Println("Testcase succesful!")
+		} else {
+			log.Println("Testcase failed")
 		}
 	}
 }

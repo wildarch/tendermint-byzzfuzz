@@ -11,30 +11,33 @@ import (
 )
 
 func ByzzFuzzExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
-	isolatedValidator := 0
-	faulty := 1
+	panic("TODO: re-implement")
+	/*
+		isolatedValidator := 0
+		faulty := 1
 
-	drops := []MessageDrop{
-		// ROUND 0
-		// Drops everything from isolatedValidator
-		{Round: 0, From: isolatedValidator, To: 0},
-		{Round: 0, From: isolatedValidator, To: 1},
-		{Round: 0, From: isolatedValidator, To: 2},
-		{Round: 0, From: isolatedValidator, To: 3},
-		// Drops everything to isolatedValidator
-		{Round: 0, From: 0, To: isolatedValidator},
-		{Round: 0, From: 1, To: isolatedValidator},
-		{Round: 0, From: 2, To: isolatedValidator},
-		{Round: 0, From: 3, To: isolatedValidator},
-	}
+		drops := []MessageDrop{
+			// ROUND 0
+			// Drops everything from isolatedValidator
+			{Round: 0, From: isolatedValidator, To: 0},
+			{Round: 0, From: isolatedValidator, To: 1},
+			{Round: 0, From: isolatedValidator, To: 2},
+			{Round: 0, From: isolatedValidator, To: 3},
+			// Drops everything to isolatedValidator
+			{Round: 0, From: 0, To: isolatedValidator},
+			{Round: 0, From: 1, To: isolatedValidator},
+			{Round: 0, From: 2, To: isolatedValidator},
+			{Round: 0, From: 3, To: isolatedValidator},
+		}
 
-	allNodes := []int{0, 1, 2, 3}
-	corruptions := []MessageCorruption{
-		{Round: 0, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
-		{Round: 1, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
-	}
+		allNodes := []int{0, 1, 2, 3}
+		corruptions := []MessageCorruption{
+			{Round: 0, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+			{Round: 1, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		}
 
-	return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
+		return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
+	*/
 }
 
 type ByzzFuzzInstanceConfig struct {
@@ -60,28 +63,29 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 	r *rand.Rand,
 	maxDrops int,
 	maxCorruptions int,
-	maxRounds int,
+	maxSteps int,
 	timeout time.Duration) ByzzFuzzInstanceConfig {
 
-	nDrops := rand.Intn(maxDrops)
+	nDrops := r.Intn(maxDrops)
 	drops := make([]MessageDrop, nDrops)
 	for i, _ := range drops {
 		drops[i] = MessageDrop{
-			Round: rand.Intn(maxRounds),
-			From:  rand.Intn(sp.N),
-			To:    rand.Intn(sp.N),
+			Step: r.Intn(maxSteps),
+			From: r.Intn(sp.N),
+			To:   r.Intn(sp.N),
 		}
 	}
 
-	byzantineNode := rand.Intn(sp.N)
-	nCorruptions := rand.Intn(maxCorruptions)
+	byzantineNode := r.Intn(sp.N)
+	nCorruptions := r.Intn(maxCorruptions)
 	corruptions := make([]MessageCorruption, nCorruptions)
 	for i, _ := range corruptions {
+		step := r.Intn(maxSteps)
 		corruptions[i] = MessageCorruption{
-			Round:      rand.Intn(maxRounds),
+			Step:       step,
 			From:       byzantineNode,
 			To:         randomSubset(r, sp.N),
-			Corruption: randomCorruption(r),
+			Corruption: randomCorruption(r, step),
 		}
 	}
 
@@ -92,6 +96,15 @@ func randomSubset(r *rand.Rand, n int) []int {
 	return r.Perm(n)[0:r.Intn(n)]
 }
 
-func randomCorruption(r *rand.Rand) CorruptionType {
-	return CorruptionTypes[r.Intn(len(CorruptionTypes))]
+func randomCorruption(r *rand.Rand, step int) CorruptionType {
+	switch step % 3 {
+	case 0:
+		return ProposalCorruptionTypes[r.Intn(len(ProposalCorruptionTypes))]
+	case 1:
+		fallthrough
+	case 2:
+		return VoteCorruptionTypes[r.Intn(len(VoteCorruptionTypes))]
+	default:
+		panic("impossible")
+	}
 }

@@ -13,16 +13,50 @@ import (
 )
 
 type MessageDrop struct {
-	Round int `json:"round"`
-	From  int `json:"from"`
-	To    int `json:"to"`
+	Step int `json:"step"`
+	From int `json:"from"`
+	To   int `json:"to"`
+}
+
+func (d *MessageDrop) MessageType() util.MessageType {
+	switch d.Step % 3 {
+	case 0:
+		return util.Proposal
+	case 1:
+		return util.Prevote
+	case 2:
+		return util.Precommit
+	default:
+		panic("impossible")
+	}
+}
+
+func (d *MessageDrop) Round() int {
+	return d.Step / 3
 }
 
 type MessageCorruption struct {
-	Round      int            `json:"round"`
+	Step       int            `json:"step"`
 	From       int            `json:"from"`
 	To         []int          `json:"to"`
 	Corruption CorruptionType `json:"corruption_type"`
+}
+
+func (c *MessageCorruption) MessageType() util.MessageType {
+	switch c.Step % 3 {
+	case 0:
+		return util.Proposal
+	case 1:
+		return util.Prevote
+	case 2:
+		return util.Precommit
+	default:
+		panic("impossible")
+	}
+}
+
+func (c *MessageCorruption) Round() int {
+	return c.Step / 3
 }
 
 type CorruptionType int
@@ -33,29 +67,36 @@ const (
 	ChangeVoteRound
 )
 
-var CorruptionTypes = []CorruptionType{
+var ProposalCorruptionTypes = []CorruptionType{
 	ChangeProposalToNil,
+}
+
+var VoteCorruptionTypes = []CorruptionType{
 	ChangeVoteToNil,
 	ChangeVoteRound,
 }
+
+const maxHeight = 3
 
 func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []MessageCorruption, timeout time.Duration) *testlib.TestCase {
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
 	init.MarkSuccess()
-	// TODO mark as failed at end
-	init.On(common.DiffCommits(), testlib.FailStateLabel)
+	init.On(spec.DiffCommits, testlib.FailStateLabel)
 
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(trackTotalRounds)
-	filters.AddFilter(spec.TrackRoundsReceived)
-	filters.AddFilter(spec.TrackCurrentHeightRound)
+	/*
+		filters.AddFilter(spec.TrackRoundsReceived)
+		filters.AddFilter(spec.TrackCurrentHeightRound)
+	*/
 
 	for _, drop := range drops {
 		filters.AddFilter(
 			testlib.If(
 				testlib.IsMessageSend().
-					And(isMessageFromTotalRound(drop.Round)).
+					And(isMessageFromTotalRound(drop.Round())).
+					And(common.IsMessageType(drop.MessageType())).
 					And(common.IsMessageFromPart(nodeLabel(drop.From))).
 					And(common.IsMessageToPart(nodeLabel(drop.To))),
 			).Then(testlib.DropMessage()),
@@ -63,21 +104,27 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 	}
 
 	for _, corruption := range corruptions {
-		action := actionForCorruption(corruption.Corruption)
-
 		filters.AddFilter(
 			testlib.If(testlib.IsMessageSend().
-				And(isMessageFromTotalRound(corruption.Round)).
+				And(isMessageFromTotalRound(corruption.Round())).
+				And(common.IsMessageType(corruption.MessageType())).
 				And(common.IsMessageFromPart(nodeLabel(corruption.From))).
 				And(IsMessageToOneOf(corruption.To)),
-			).Then(action),
+			).Then(corruption.Action()),
 		)
 	}
+
+	filters.AddFilter(testlib.If(common.HeightReached(maxHeight)).Then(endTest))
 
 	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout, sm, filters)
 	testcase.SetupFunc(common.Setup(sp, labelNodes))
 
 	return testcase
+}
+
+func endTest(e *types.Event, c *testlib.Context) []*types.Message {
+	c.EndTestCase()
+	return []*types.Message{}
 }
 
 func nodeLabel(idx int) string {

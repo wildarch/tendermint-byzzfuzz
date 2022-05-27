@@ -8,8 +8,8 @@ import (
 	"github.com/netrixframework/tendermint-testing/util"
 )
 
-func actionForCorruption(corruptionType CorruptionType) testlib.Action {
-	switch corruptionType {
+func (c *MessageCorruption) Action() testlib.Action {
+	switch c.Corruption {
 	case ChangeProposalToNil:
 		return changeProposalToNil
 	case ChangeVoteToNil:

@@ -19,6 +19,10 @@ import (
 	"github.com/netrixframework/tendermint-testing/common"
 	"github.com/netrixframework/tendermint-testing/testcases/rskip"
 	"github.com/netrixframework/tendermint-testing/util"
+
+	"database/sql"
+
+	_ "modernc.org/sqlite"
 )
 
 var serverBindIp = flag.String("bind-ip", "192.167.0.1", "IP address to bind the testing server on. Should match controller-master-addr in node configuration.")
@@ -26,7 +30,7 @@ var logLevel = flag.String("log-level", "info", "Log level, one of panic|fatal|e
 
 const (
 	// Main parameters for ByzzFuzz algorithm
-	defaultMaxDrops       = 3
+	defaultMaxDrops       = 5
 	defaultMaxCorruptions = 5
 	defaultMaxSteps       = 10
 )
@@ -36,6 +40,7 @@ var maxDrops = fuzzCmd.Int("max-drops", defaultMaxDrops, "Bound on the number of
 var maxCorruptions = fuzzCmd.Int("max-corruptions", defaultMaxCorruptions, "Bound on the number of message corruptions")
 var maxSteps = fuzzCmd.Int("max-steps", defaultMaxSteps, "Bound on the number of protocol consensus steps")
 var timeout = fuzzCmd.Duration("timeout", 2*time.Minute, "Timeout per test instance")
+var testDb = fuzzCmd.String("db", "test_results.sqlite3", "Path to test results output file")
 
 var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
 var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on ByzzFuzz instance")
@@ -77,6 +82,8 @@ func unittest(args []string) {
 
 func fuzz(args []string) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	db := openTestDb()
+	_ = db
 
 	for {
 		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxSteps, *timeout)
@@ -85,11 +92,53 @@ func fuzz(args []string) {
 		if runSingleTestCase(sysParams, testcase) {
 			break
 		}
-		if testcase.StateMachine.InSuccessState() {
+		success := testcase.StateMachine.InSuccessState()
+		if success {
 			log.Println("Testcase succesful!")
 		} else {
 			log.Println("Testcase failed")
 		}
+		addTestResult(db, instance, success)
+	}
+}
+
+func openTestDb() *sql.DB {
+	db, err := sql.Open("sqlite", *testDb)
+	if err != nil {
+		log.Fatalf("failed to open test database: %s", err.Error())
+	}
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS TestResults(
+			config JSON,
+			pass INT,
+			fail INT);
+	`)
+	if err != nil {
+		log.Fatalf("failed to create test data: %s", err.Error())
+	}
+
+	return db
+}
+
+func addTestResult(db *sql.DB, instance byzzfuzz.ByzzFuzzInstanceConfig, success bool) {
+	row := db.QueryRow("SELECT rowid, pass, fail FROM TestResults WHERE config = ?", instance.Json())
+	rowid := 0
+	pass := 0
+	fail := 0
+	err := row.Scan(&rowid, &pass, &fail)
+	if err == sql.ErrNoRows {
+		if success {
+			pass++
+		} else {
+			fail++
+		}
+		_, err = db.Exec("INSERT INTO TestResults VALUES (?, ?, ?)", instance.Json(), pass, fail)
+		if err != nil {
+			log.Fatalf("failed to write to DB")
+		}
+	} else {
+		db.Exec("UPDATE TestResults SET pass=? fail=? WHERE rowid=?", pass, fail, rowid)
 	}
 }
 

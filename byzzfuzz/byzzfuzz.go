@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/netrixframework/netrix/testlib"
@@ -68,7 +69,7 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 
 	nDrops := r.Intn(maxDrops)
 	drops := make([]MessageDrop, nDrops)
-	for i, _ := range drops {
+	for i := range drops {
 		drops[i] = MessageDrop{
 			Step: r.Intn(maxSteps),
 			From: r.Intn(sp.N),
@@ -79,7 +80,7 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 	byzantineNode := r.Intn(sp.N)
 	nCorruptions := r.Intn(maxCorruptions)
 	corruptions := make([]MessageCorruption, nCorruptions)
-	for i, _ := range corruptions {
+	for i := range corruptions {
 		step := r.Intn(maxSteps)
 		corruptions[i] = MessageCorruption{
 			Step:       step,
@@ -93,7 +94,9 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 }
 
 func randomSubset(r *rand.Rand, n int) []int {
-	return r.Perm(n)[0:r.Intn(n)]
+	subset := r.Perm(n)[0:r.Intn(n)]
+	sort.Ints(subset)
+	return subset
 }
 
 func randomCorruption(r *rand.Rand, step int) CorruptionType {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,10 +22,11 @@ import (
 )
 
 var serverBindIp = flag.String("bind-ip", "192.167.0.1", "IP address to bind the testing server on. Should match controller-master-addr in node configuration.")
+var logLevel = flag.String("log-level", "info", "Log level, one of panic|fatal|error|warn|warning|info|debug|trace")
 
 const (
 	// Main parameters for ByzzFuzz algorithm
-	defaultMaxDrops       = 10
+	defaultMaxDrops       = 3
 	defaultMaxCorruptions = 5
 	defaultMaxRounds      = 5
 )
@@ -41,23 +43,31 @@ var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on
 var sysParams = common.NewSystemParams(4)
 
 func main() {
-	if len(os.Args) <= 1 {
+	flag.Parse()
+	commandIndex := 1
+	for _, v := range os.Args[1:] {
+		if !strings.HasPrefix(v, "-") {
+			break
+		}
+		commandIndex++
+	}
+	if len(os.Args) <= commandIndex {
 		fmt.Printf("Usage: %s unittest|fuzz\n", os.Args[0])
 		os.Exit(1)
 	}
-	switch os.Args[1] {
+	switch os.Args[commandIndex] {
 	case "unittest":
-		unittest()
+		unittest(os.Args[commandIndex+1:])
 	case "fuzz":
-		fuzz()
+		fuzz(os.Args[commandIndex+1:])
 	default:
 		fmt.Println("expected 'unittest' or 'fuzz' subcommands")
 		os.Exit(1)
 	}
 }
 
-func unittest() {
-	unittestCmd.Parse(os.Args[2:])
+func unittest(args []string) {
+	unittestCmd.Parse(args)
 	if *useByzzfuzz {
 		runSingleTestCase(sysParams, byzzfuzz.ByzzFuzzExpectNewRound(sysParams))
 	} else {
@@ -65,13 +75,14 @@ func unittest() {
 	}
 }
 
-func fuzz() {
+func fuzz(args []string) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for {
 		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxRounds, *timeout)
 		log.Printf("Running test instance: %s", instance.Json())
-		if runSingleTestCase(sysParams, instance.TestCase()) {
+		testcase := instance.TestCase()
+		if runSingleTestCase(sysParams, testcase) {
 			break
 		}
 	}
@@ -88,6 +99,7 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 			LogConfig: config.LogConfig{
 				Format: "json",
 				Path:   "/tmp/tendermint/log/checker.log",
+				Level:  *logLevel,
 			},
 		},
 		&util.TMessageParser{},

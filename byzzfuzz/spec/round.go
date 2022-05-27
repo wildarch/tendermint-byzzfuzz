@@ -2,6 +2,7 @@ package spec
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/testlib"
@@ -9,9 +10,80 @@ import (
 	"github.com/netrixframework/tendermint-testing/util"
 )
 
-// Keeps track of the highest round number (and associated height) received from peer nodes.
-// This is used to check that nodes move to a higher round of they received f+1 messages with a higher round number.
-func RecordHighestRoundNumberReceived(e *types.Event, ctx *testlib.Context) (messages []*types.Message, handled bool) {
+type heightRound struct {
+	height int
+	round  int
+}
+
+type nodeSet struct {
+	nodes []types.ReplicaID
+}
+
+func newNodeSet() nodeSet {
+	return nodeSet{
+		nodes: make([]types.ReplicaID, 0),
+	}
+}
+
+func (s *nodeSet) Add(r types.ReplicaID) {
+	found := false
+	for _, v := range s.nodes {
+		if v == r {
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.nodes = append(s.nodes, r)
+	}
+}
+
+type roundsReceived struct {
+	received map[heightRound]nodeSet
+}
+
+func (rr *roundsReceived) Update(from types.ReplicaID, hr heightRound) {
+	set, found := rr.received[hr]
+	if !found {
+		set = newNodeSet()
+	}
+	set.Add(from)
+	rr.received[hr] = set
+}
+
+type expectedSteps struct {
+	steps []heightRound
+}
+
+func (es *expectedSteps) Add(step heightRound) {
+	found := false
+	for _, v := range es.steps {
+		if v == step {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		es.steps = append(es.steps, step)
+	}
+}
+
+func (es *expectedSteps) Remove(step heightRound) {
+	index := -1
+	for i, v := range es.steps {
+		if v == step {
+			index = i
+			break
+		}
+	}
+
+	if index != -1 {
+		es.steps = append(es.steps[:index], es.steps[index+1:]...)
+	}
+}
+
+func TrackRoundsReceived(e *types.Event, ctx *testlib.Context) (messages []*types.Message, handled bool) {
 	if !testlib.IsMessageReceive()(e, ctx) {
 		return
 	}
@@ -24,107 +96,112 @@ func RecordHighestRoundNumberReceived(e *types.Event, ctx *testlib.Context) (mes
 		return
 	}
 	hr := heightRound{height: height, round: round}
-	hrrR, found := ctx.Vars.Get(highestRoundReceivedKey(e.Replica))
-	if !found {
-		hrrR = highestRoundReceived{from: make(map[types.ReplicaID]heightRound)}
-	}
-	hrr := hrrR.(highestRoundReceived)
-	if hrr.Update(message.From, hr) {
-		ctx.Logger().With(log.LogParams{
-			"replica": e.Replica,
-			"from":    message.From,
-			"height":  height,
-			"round":   round,
-		}).Debug("Update highest round")
 
-		ctx.Vars.Set(highestRoundReceivedKey(e.Replica), hrr)
+	// Update the counts
+	rrR, found := ctx.Vars.Get(roundsReceivedKey(e.Replica))
+	if !found {
+		rrR = roundsReceived{received: make(map[heightRound]nodeSet)}
+	}
+	rr := rrR.(roundsReceived)
+	rr.Update(message.From, hr)
+	ctx.Vars.Set(roundsReceivedKey(e.Replica), rr)
+
+	currentHrR, found := ctx.Vars.Get(currentHeightRoundKey(e.Replica))
+	if !found {
+		currentHrR = heightRound{height: 1, round: 0}
+	}
+	currentHr := currentHrR.(heightRound)
+
+	if hr.height < currentHr.height || (hr.height == currentHr.height && hr.round < currentHr.round) {
+		// Not interesting, we are already at a later round
+		return
+	}
+
+	// Checks if we expect a newStep
+	faults, ok := ctx.Vars.GetInt("faults")
+	if !ok {
+		panic("Number of faulty nodes not saved in vars")
+	}
+	if len(rr.received[hr].nodes) >= (faults + 1) {
+		// Add an expected step
+		esR, found := ctx.Vars.Get(expectedStepsKey(e.Replica))
+		if !found {
+			esR = expectedSteps{steps: make([]heightRound, 0)}
+		}
+		es := esR.(expectedSteps)
+		es.Add(hr)
+		logExpectedSteps(ctx, e.Replica, es)
+		ctx.Vars.Set(expectedStepsKey(e.Replica), es)
 	}
 
 	return
 }
 
-type heightRound struct {
-	height int
-	round  int
+func roundsReceivedKey(id types.ReplicaID) string {
+	return fmt.Sprintf("BF_rounds_received_%s", id)
 }
 
-type highestRoundReceived struct {
-	from map[types.ReplicaID]heightRound
+func expectedStepsKey(id types.ReplicaID) string {
+	return fmt.Sprintf("BF_expected_steps_%s", id)
 }
 
-func (hrr *highestRoundReceived) Update(from types.ReplicaID, new heightRound) bool {
-	hr, found := hrr.from[from]
-	if !found || hr.height < new.height || (hr.height == new.height && hr.round < new.round) {
-		hrr.from[from] = new
-		return true
-	}
-	return false
-}
-
-func (hrr *highestRoundReceived) HasHigherMajority(faults int, height int, round int) bool {
-	for _, hr := range hrr.from {
-		if hr.height > height || (hr.height == height && hr.round > round) {
-			if hrr.hasMajority(faults, hr.height, hr.round) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-func (hrr *highestRoundReceived) hasMajority(faults int, height int, round int) bool {
-	count := 0
-	for _, hr := range hrr.from {
-		if hr.height == height && hr.round == round {
-			count++
-		}
-	}
-
-	return count >= (faults + 1)
-}
-
-func highestRoundReceivedKey(id types.ReplicaID) string {
-	return fmt.Sprintf("BF_highest_round_received_%s", id)
-}
-
-func SendsMessageWithTooLowRound(e *types.Event, c *testlib.Context) bool {
-	if !testlib.IsMessageSend()(e, c) {
-		return false
-	}
-	message, ok := util.GetMessageFromEvent(e, c)
+func TrackCurrentHeightRound(e *types.Event, ctx *testlib.Context) (messages []*types.Message, handled bool) {
+	eType, ok := e.Type.(*types.GenericEventType)
 	if !ok {
-		return false
+		return
 	}
-	height, round := message.HeightRound()
-	if round < 0 {
-		return false
+	if eType.T != "newStep" {
+		return
 	}
-	hrrR, found := c.Vars.Get(highestRoundReceivedKey(e.Replica))
+	heightS, ok := eType.Params["height"]
+	if !ok {
+		return
+	}
+	height, err := strconv.Atoi(heightS)
+	if err != nil {
+		return
+	}
+	roundS, ok := eType.Params["round"]
+	if !ok {
+		return
+	}
+	round, err := strconv.Atoi(roundS)
+	if err != nil {
+		return
+	}
+	ctx.Logger().With(log.LogParams{
+		"replica": e.Replica,
+		"height":  height,
+		"round":   round,
+	}).Debug("newStep")
+	hr := heightRound{height, round}
+	ctx.Vars.Set(currentHeightRoundKey(e.Replica), hr)
+
+	// Check if we expected this step already
+	esR, found := ctx.Vars.Get(expectedStepsKey(e.Replica))
 	if !found {
-		return false
+		return
 	}
-	hrr := hrrR.(highestRoundReceived)
+	es := esR.(expectedSteps)
+	es.Remove(hr)
+	ctx.Vars.Set(expectedStepsKey(e.Replica), es)
+	logExpectedSteps(ctx, e.Replica, es)
+	return
+}
 
-	faults, ok := c.Vars.GetInt("faults")
-	if !ok {
-		panic("Number of faulty nodes not saved in vars")
-	}
+func currentHeightRoundKey(id types.ReplicaID) string {
+	return fmt.Sprintf("BF_current_height_round_%s", id)
+}
 
-	c.Logger().With(log.LogParams{
-		"highest_round_received": fmt.Sprint(hrr),
-		"height":                 height,
-		"round":                  round,
-	}).Debug("checking message round is not too low")
-
-	if hrr.HasHigherMajority(faults, height, round) {
-		c.Logger().With(log.LogParams{
-			"height":                 height,
-			"round":                  round,
-			"highest_round_received": fmt.Sprint(hrr),
-		}).Error("Found message with too low height/round")
-		return true
+func logExpectedSteps(ctx *testlib.Context, r types.ReplicaID, es expectedSteps) {
+	if len(es.steps) == 0 {
+		ctx.Logger().With(log.LogParams{
+			"replica": r,
+		}).Info("No more steps expected")
 	} else {
-		return false
+		ctx.Logger().With(log.LogParams{
+			"replica": r,
+			"steps":   len(es.steps),
+		}).Info("Expected more steps")
 	}
 }

@@ -39,32 +39,17 @@ var CorruptionTypes = []CorruptionType{
 	ChangeVoteRound,
 }
 
-const maxHeight = 3
-
 func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []MessageCorruption, timeout time.Duration) *testlib.TestCase {
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
-	maxHeightReached := init.On(common.HeightReached(maxHeight), "maxHeightReached")
-	maxHeightReached.On(
-		common.DiffCommits(),
-		testlib.FailStateLabel,
-	)
-	// TODO: Check if we expect consensus to be possible based on number of network faults
-	maxHeightReached.On(
-		common.IsCommit(),
-		testlib.SuccessStateLabel,
-	)
+	init.MarkSuccess()
+	// TODO mark as failed at end
+	init.On(common.DiffCommits(), testlib.FailStateLabel)
 
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(trackTotalRounds)
-	filters.AddFilter(spec.RecordHighestRoundNumberReceived)
-	// Testing
-	filters.AddFilter(testlib.If(spec.SendsMessageWithTooLowRound).Then(
-		func(e *types.Event, ctx *testlib.Context) []*types.Message {
-			ctx.Abort()
-			return nil
-		},
-	))
+	filters.AddFilter(spec.TrackRoundsReceived)
+	filters.AddFilter(spec.TrackCurrentHeightRound)
 
 	for _, drop := range drops {
 		filters.AddFilter(

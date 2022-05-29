@@ -31,7 +31,7 @@ func DiffCommits(e *types.Event, c *testlib.Context) bool {
 			c.Logger().With(log.LogParams{
 				"cur_block_id": curBlockID,
 				"block_id":     blockID,
-			}).Info("Checking if block IDs match")
+			}).Debug("Checking if block IDs match")
 			return blockID != curBlockID
 		}
 	}

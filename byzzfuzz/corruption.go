@@ -3,6 +3,7 @@ package byzzfuzz
 import (
 	"bytes"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/testlib"
 	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/tendermint-testing/util"
@@ -59,6 +60,11 @@ func changeVoteToNil(e *types.Event, c *testlib.Context) []*types.Message {
 	if err != nil {
 		return []*types.Message{message}
 	}
+	c.Logger().With(log.LogParams{
+		"height": tMsg.Height(),
+		"round":  tMsg.Round(),
+		"from":   e.Replica,
+	}).Info("ChangeVoteToNil corruption")
 	return []*types.Message{c.NewMessage(message, msgB)}
 }
 
@@ -100,6 +106,11 @@ func changeVoteRound(e *types.Event, c *testlib.Context) []*types.Message {
 	if err != nil {
 		return []*types.Message{m}
 	}
+	c.Logger().With(log.LogParams{
+		"height": tMsg.Height(),
+		"round":  tMsg.Round(),
+		"from":   e.Replica,
+	}).Info("ChangeVoteRound corruption")
 	return []*types.Message{c.NewMessage(m, msgB)}
 }
 
@@ -120,5 +131,10 @@ func changeProposalToNil(e *types.Event, c *testlib.Context) []*types.Message {
 		//c.Logger().With(log.LogParams{"error": err}).Error("Failed to marshal changed proposal")
 		return []*types.Message{message}
 	}
+	c.Logger().With(log.LogParams{
+		"height": tMsg.Height(),
+		"round":  tMsg.Round(),
+		"from":   e.Replica,
+	}).Info("ChangeProposalToNil corruption")
 	return []*types.Message{c.NewMessage(message, newMsgB)}
 }

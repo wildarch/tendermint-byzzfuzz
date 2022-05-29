@@ -99,7 +99,7 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 					And(common.IsMessageType(drop.MessageType())).
 					And(common.IsMessageFromPart(nodeLabel(drop.From))).
 					And(common.IsMessageToPart(nodeLabel(drop.To))),
-			).Then(testlib.DropMessage()),
+			).Then(dropMessageLoudly),
 		)
 	}
 
@@ -154,4 +154,20 @@ func IsMessageToOneOf(replicaIdxs []int) testlib.Condition {
 		cond = cond.Or(common.IsMessageToPart(nodeLabel(replicaIdx)))
 	}
 	return cond
+}
+
+func dropMessageLoudly(e *types.Event, c *testlib.Context) (message []*types.Message) {
+	m, ok := util.GetMessageFromEvent(e, c)
+	if ok {
+		c.Logger().With(log.LogParams{
+			"from":   m.From,
+			"to":     m.To,
+			"type":   m.Type,
+			"height": m.Height(),
+			"round":  m.Round(),
+		}).Info("Dropping message")
+	} else {
+		c.Logger().Info("Dropping message with unknown height/round")
+	}
+	return
 }

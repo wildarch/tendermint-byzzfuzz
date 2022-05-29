@@ -12,33 +12,42 @@ import (
 )
 
 func ByzzFuzzExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
-	panic("TODO: re-implement")
-	/*
-		isolatedValidator := 0
-		faulty := 1
+	isolatedValidator := 0
+	faulty := 1
+	drops := []MessageDrop{
+		// Drop all Prevote or Precommit to isolatedValidator in round 0
+		{Step: 1, From: 0, To: isolatedValidator},
+		{Step: 1, From: 1, To: isolatedValidator},
+		{Step: 1, From: 2, To: isolatedValidator},
+		{Step: 1, From: 3, To: isolatedValidator},
+		{Step: 2, From: 0, To: isolatedValidator},
+		{Step: 2, From: 1, To: isolatedValidator},
+		{Step: 2, From: 2, To: isolatedValidator},
+		{Step: 2, From: 3, To: isolatedValidator},
 
-		drops := []MessageDrop{
-			// ROUND 0
-			// Drops everything from isolatedValidator
-			{Round: 0, From: isolatedValidator, To: 0},
-			{Round: 0, From: isolatedValidator, To: 1},
-			{Round: 0, From: isolatedValidator, To: 2},
-			{Round: 0, From: isolatedValidator, To: 3},
-			// Drops everything to isolatedValidator
-			{Round: 0, From: 0, To: isolatedValidator},
-			{Round: 0, From: 1, To: isolatedValidator},
-			{Round: 0, From: 2, To: isolatedValidator},
-			{Round: 0, From: 3, To: isolatedValidator},
-		}
+		// Drop all Prevote or Precommit from isolatedValidator in round 0
+		{Step: 1, From: isolatedValidator, To: 0},
+		{Step: 1, From: isolatedValidator, To: 1},
+		{Step: 1, From: isolatedValidator, To: 2},
+		{Step: 1, From: isolatedValidator, To: 3},
+		{Step: 2, From: isolatedValidator, To: 0},
+		{Step: 2, From: isolatedValidator, To: 1},
+		{Step: 2, From: isolatedValidator, To: 2},
+		{Step: 2, From: isolatedValidator, To: 3},
+	}
+	// Change all votes from faulty to nil
+	allNodes := []int{0, 1, 2, 3}
+	corruptions := []MessageCorruption{
+		{Step: 1, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 2, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 4, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 5, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 7, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 8, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		// Assume three rounds is enough
+	}
 
-		allNodes := []int{0, 1, 2, 3}
-		corruptions := []MessageCorruption{
-			{Round: 0, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
-			{Round: 1, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
-		}
-
-		return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
-	*/
+	return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
 }
 
 type ByzzFuzzInstanceConfig struct {

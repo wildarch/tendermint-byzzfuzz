@@ -86,10 +86,7 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(trackTotalRounds)
-	/*
-		filters.AddFilter(spec.TrackRoundsReceived)
-		filters.AddFilter(spec.TrackCurrentHeightRound)
-	*/
+	//filters.AddFilter(spec.TrackCurrentHeightRound)
 
 	for _, drop := range drops {
 		filters.AddFilter(
@@ -165,9 +162,9 @@ func dropMessageLoudly(e *types.Event, c *testlib.Context) (message []*types.Mes
 			"type":   m.Type,
 			"height": m.Height(),
 			"round":  m.Round(),
-		}).Info("Dropping message")
+		}).Debug("Dropping message")
 	} else {
-		c.Logger().Info("Dropping message with unknown height/round")
+		c.Logger().Warn("Dropping message with unknown height/round")
 	}
 	return
 }

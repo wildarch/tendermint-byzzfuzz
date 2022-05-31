@@ -81,6 +81,7 @@ func unittest(args []string) {
 }
 
 func fuzz(args []string) {
+	fuzzCmd.Parse(args)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	db := openTestDb()
 	_ = db

@@ -92,7 +92,7 @@ func TrackRoundsReceived(e *types.Event, ctx *testlib.Context) (messages []*type
 		return
 	}
 	height, round := message.HeightRound()
-	if round < 0 {
+	if round < 0 || (height == 1 && round == 0) {
 		return
 	}
 	hr := heightRound{height: height, round: round}
@@ -112,8 +112,8 @@ func TrackRoundsReceived(e *types.Event, ctx *testlib.Context) (messages []*type
 	}
 	currentHr := currentHrR.(heightRound)
 
-	if hr.height < currentHr.height || (hr.height == currentHr.height && hr.round < currentHr.round) {
-		// Not interesting, we are already at a later round
+	if hr.height <= currentHr.height || (hr.height == currentHr.height && hr.round <= currentHr.round) {
+		// Not interesting, we are already at that or a later round
 		return
 	}
 
@@ -146,6 +146,7 @@ func expectedStepsKey(id types.ReplicaID) string {
 }
 
 func TrackCurrentHeightRound(e *types.Event, ctx *testlib.Context) (messages []*types.Message, handled bool) {
+	TrackRoundsReceived(e, ctx)
 	eType, ok := e.Type.(*types.GenericEventType)
 	if !ok {
 		return
@@ -196,12 +197,26 @@ func currentHeightRoundKey(id types.ReplicaID) string {
 func logExpectedSteps(ctx *testlib.Context, r types.ReplicaID, es expectedSteps) {
 	if len(es.steps) == 0 {
 		ctx.Logger().With(log.LogParams{
-			"replica": r,
+			"node": getPartLabel(ctx, r),
 		}).Info("No more steps expected")
 	} else {
 		ctx.Logger().With(log.LogParams{
-			"replica": r,
-			"steps":   len(es.steps),
+			"node":  getPartLabel(ctx, r),
+			"steps": fmt.Sprintf("%v", es.steps),
 		}).Info("Expected more steps")
 	}
+}
+
+func getPartLabel(ctx *testlib.Context, id types.ReplicaID) string {
+	partitionR, ok := ctx.Vars.Get("partition")
+	if !ok {
+		panic("No partition found")
+	}
+	partition := partitionR.(*util.Partition)
+	for _, p := range partition.Parts {
+		if p.Contains(id) {
+			return p.Label
+		}
+	}
+	panic("Replica not found")
 }

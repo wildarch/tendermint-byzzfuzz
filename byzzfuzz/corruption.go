@@ -64,7 +64,7 @@ func changeVoteToNil(e *types.Event, c *testlib.Context) []*types.Message {
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),
 		"from":   e.Replica,
-	}).Info("ChangeVoteToNil corruption")
+	}).Debug("ChangeVoteToNil corruption")
 	return []*types.Message{c.NewMessage(message, msgB)}
 }
 
@@ -110,7 +110,7 @@ func changeVoteRound(e *types.Event, c *testlib.Context) []*types.Message {
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),
 		"from":   e.Replica,
-	}).Info("ChangeVoteRound corruption")
+	}).Debug("ChangeVoteRound corruption")
 	return []*types.Message{c.NewMessage(m, msgB)}
 }
 
@@ -135,6 +135,6 @@ func changeProposalToNil(e *types.Event, c *testlib.Context) []*types.Message {
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),
 		"from":   e.Replica,
-	}).Info("ChangeProposalToNil corruption")
+	}).Debug("ChangeProposalToNil corruption")
 	return []*types.Message{c.NewMessage(message, newMsgB)}
 }

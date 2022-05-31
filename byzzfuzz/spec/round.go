@@ -104,6 +104,7 @@ func TrackRoundsReceived(e *types.Event, ctx *testlib.Context) (messages []*type
 	}
 	rr := rrR.(roundsReceived)
 	rr.Update(message.From, hr)
+	//fmt.Printf("!! recv,%s,%s,%d,%d\n", getPartLabel(ctx, message.From), getPartLabel(ctx, e.Replica), hr.height, hr.round)
 	ctx.Vars.Set(roundsReceivedKey(e.Replica), rr)
 
 	currentHrR, found := ctx.Vars.Get(currentHeightRoundKey(e.Replica))
@@ -170,6 +171,7 @@ func TrackCurrentHeightRound(e *types.Event, ctx *testlib.Context) (messages []*
 	if err != nil {
 		return
 	}
+	//fmt.Printf("!! step,%s,%d,%d\n", getPartLabel(ctx, e.Replica), height, round)
 	ctx.Logger().With(log.LogParams{
 		"replica": e.Replica,
 		"height":  height,

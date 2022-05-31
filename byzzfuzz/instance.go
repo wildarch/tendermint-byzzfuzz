@@ -78,7 +78,7 @@ var VoteCorruptionTypes = []CorruptionType{
 
 const maxHeight = 3
 
-func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []MessageCorruption, timeout time.Duration) *testlib.TestCase {
+func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []MessageCorruption, timeout time.Duration) (*testlib.TestCase, chan spec.Event) {
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
 	init.MarkSuccess()
@@ -87,6 +87,8 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(trackTotalRounds)
 	//filters.AddFilter(spec.TrackCurrentHeightRound)
+	specEventCh := make(chan spec.Event, 10000)
+	filters.AddFilter(spec.Log(specEventCh))
 
 	for _, drop := range drops {
 		filters.AddFilter(
@@ -116,7 +118,7 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout, sm, filters)
 	testcase.SetupFunc(common.Setup(sp, labelNodes))
 
-	return testcase
+	return testcase, specEventCh
 }
 
 func endTest(e *types.Event, c *testlib.Context) []*types.Message {

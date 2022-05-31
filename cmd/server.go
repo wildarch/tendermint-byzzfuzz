@@ -2,6 +2,7 @@ package main
 
 import (
 	"byzzfuzz/byzzfuzz"
+	"byzzfuzz/byzzfuzz/spec"
 	"byzzfuzz/docker"
 	"flag"
 	"fmt"
@@ -17,7 +18,6 @@ import (
 	"github.com/netrixframework/netrix/config"
 	"github.com/netrixframework/netrix/testlib"
 	"github.com/netrixframework/tendermint-testing/common"
-	"github.com/netrixframework/tendermint-testing/testcases/rskip"
 	"github.com/netrixframework/tendermint-testing/util"
 
 	"database/sql"
@@ -74,9 +74,11 @@ func main() {
 func unittest(args []string) {
 	unittestCmd.Parse(args)
 	if *useByzzfuzz {
-		runSingleTestCase(sysParams, byzzfuzz.ByzzFuzzExpectNewRound(sysParams))
+		testcase, specCh := byzzfuzz.ByzzFuzzExpectNewRound(sysParams)
+		runSingleTestCase(sysParams, testcase)
+		spec.Check(specCh)
 	} else {
-		runSingleTestCase(sysParams, rskip.ExpectNewRound(sysParams))
+		runSingleTestCase(sysParams, byzzfuzz.ExpectNewRound(sysParams))
 	}
 }
 
@@ -89,7 +91,8 @@ func fuzz(args []string) {
 	for {
 		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxSteps, *timeout)
 		log.Printf("Running test instance: %s", instance.Json())
-		testcase := instance.TestCase()
+		testcase, specCh := instance.TestCase()
+		spec.Check(specCh)
 		if runSingleTestCase(sysParams, testcase) {
 			break
 		}

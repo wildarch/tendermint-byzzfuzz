@@ -1,6 +1,7 @@
 package byzzfuzz
 
 import (
+	"byzzfuzz/byzzfuzz/spec"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -11,7 +12,7 @@ import (
 	"github.com/netrixframework/tendermint-testing/common"
 )
 
-func ByzzFuzzExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
+func ByzzFuzzExpectNewRound(sp *common.SystemParams) (*testlib.TestCase, chan spec.Event) {
 	isolatedValidator := 0
 	faulty := 1
 	drops := []MessageDrop{
@@ -38,13 +39,21 @@ func ByzzFuzzExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
 	// Change all votes from faulty to nil
 	allNodes := []int{0, 1, 2, 3}
 	corruptions := []MessageCorruption{
+		// Round 0
 		{Step: 1, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 		{Step: 2, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		// Round 1
 		{Step: 4, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 		{Step: 5, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		// Round 2
 		{Step: 7, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 		{Step: 8, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
-		// Assume three rounds is enough
+		// Round 3
+		{Step: 10, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 11, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		// Round 4
+		{Step: 13, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
+		{Step: 14, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 	}
 
 	return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
@@ -57,7 +66,7 @@ type ByzzFuzzInstanceConfig struct {
 	Timeout     time.Duration       `json:"timeout"`
 }
 
-func (c *ByzzFuzzInstanceConfig) TestCase() *testlib.TestCase {
+func (c *ByzzFuzzInstanceConfig) TestCase() (*testlib.TestCase, chan spec.Event) {
 	return ByzzFuzzInst(c.sysParams, c.Drops, c.Corruptions, c.Timeout)
 }
 

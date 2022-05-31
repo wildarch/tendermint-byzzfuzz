@@ -60,6 +60,7 @@ func changeVoteToNil(e *types.Event, c *testlib.Context) []*types.Message {
 	if err != nil {
 		return []*types.Message{message}
 	}
+	//fmt.Printf("ChangeVoteToNil H=%d/R=%d %s %s -> %s\n", tMsg.Height(), tMsg.Round(), message.Type, message.From, message.To)
 	c.Logger().With(log.LogParams{
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),

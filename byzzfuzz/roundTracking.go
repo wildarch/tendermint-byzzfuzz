@@ -7,6 +7,7 @@ import (
 	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/testlib"
 	"github.com/netrixframework/netrix/types"
+	"github.com/netrixframework/tendermint-testing/util"
 )
 
 func trackTotalRounds(e *types.Event, c *testlib.Context) (messages []*types.Message, handled bool) {
@@ -69,6 +70,7 @@ func trackTotalRounds(e *types.Event, c *testlib.Context) (messages []*types.Mes
 	c.Vars.Set(prevHeightKey(e.Replica), height)
 	c.Vars.Set(prevRoundKey(e.Replica), round)
 	c.Vars.Set(totalRoundsKey(e.Replica), totalRounds)
+	c.Vars.Set(totalRoundForHeightRoundKey(e.Replica, height, round), totalRounds)
 
 	return
 }
@@ -79,10 +81,18 @@ func isMessageFromTotalRound(round int) testlib.Condition {
 			panic("isMessageFromTotalRound uses the round as perceived by the sender, " +
 				"thus must be used together with isMessageSend")
 		}
-
-		totalRounds, ok := c.Vars.GetInt(totalRoundsKey(e.Replica))
+		message, ok := util.GetMessageFromEvent(e, c)
 		if !ok {
-			totalRounds = 0
+			panic("Message not found!")
+		}
+		if message.Round() == -1 {
+			return false
+		}
+
+		totalRounds, ok := c.Vars.GetInt(
+			totalRoundForHeightRoundKey(e.Replica, message.Height(), message.Round()))
+		if !ok {
+			panic(fmt.Sprintf("round %d not found", message.Round()))
 		}
 		return totalRounds == round
 	}
@@ -98,4 +108,8 @@ func prevRoundKey(r types.ReplicaID) string {
 
 func totalRoundsKey(r types.ReplicaID) string {
 	return fmt.Sprintf("BF_total_rounds_%s", r)
+}
+
+func totalRoundForHeightRoundKey(r types.ReplicaID, height int, round int) string {
+	return fmt.Sprintf("BF_total_round_%s_%d_%d", r, height, round)
 }

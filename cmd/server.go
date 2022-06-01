@@ -92,10 +92,10 @@ func fuzz(args []string) {
 		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxSteps, *timeout)
 		log.Printf("Running test instance: %s", instance.Json())
 		testcase, specCh := instance.TestCase()
-		spec.Check(specCh)
 		if runSingleTestCase(sysParams, testcase) {
 			break
 		}
+		spec.Check(specCh)
 		success := testcase.StateMachine.InSuccessState()
 		if success {
 			log.Println("Testcase succesful!")

@@ -86,7 +86,7 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(trackTotalRounds)
-	//filters.AddFilter(spec.TrackCurrentHeightRound)
+	filters.AddFilter(spec.TrackCurrentHeightRound)
 	specEventCh := make(chan spec.Event, 10000)
 	filters.AddFilter(spec.Log(specEventCh))
 

@@ -92,7 +92,8 @@ func isMessageFromTotalRound(round int) testlib.Condition {
 		totalRounds, ok := c.Vars.GetInt(
 			totalRoundForHeightRoundKey(e.Replica, message.Height(), message.Round()))
 		if !ok {
-			panic(fmt.Sprintf("round %d not found", message.Round()))
+			// This can happen if the node is byzantine and produces a message for an invalid round
+			return false
 		}
 		return totalRounds == round
 	}

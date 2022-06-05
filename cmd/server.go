@@ -36,10 +36,10 @@ const (
 )
 
 var fuzzCmd = flag.NewFlagSet("fuzz", flag.ExitOnError)
-var maxDrops = fuzzCmd.Int("max-drops", defaultMaxDrops, "Bound on the number of network link faults")
-var maxCorruptions = fuzzCmd.Int("max-corruptions", defaultMaxCorruptions, "Bound on the number of message corruptions")
-var maxSteps = fuzzCmd.Int("max-steps", defaultMaxSteps, "Bound on the number of protocol consensus steps")
-var timeout = fuzzCmd.Duration("timeout", 2*time.Minute, "Timeout per test instance")
+var drops = fuzzCmd.Int("drops", defaultMaxDrops, "Bound on the number of network link faults")
+var corruptions = fuzzCmd.Int("corruptions", defaultMaxCorruptions, "Bound on the number of message corruptions")
+var steps = fuzzCmd.Int("steps", defaultMaxSteps, "Bound on the number of protocol consensus steps")
+var timeout = fuzzCmd.Duration("timeout", 1*time.Minute, "Timeout per test instance")
 var testDb = fuzzCmd.String("db", "test_results.sqlite3", "Path to test results output file")
 
 var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
@@ -98,7 +98,7 @@ func fuzz(args []string) {
 	_ = db
 
 	for {
-		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *maxDrops, *maxCorruptions, *maxSteps, *timeout)
+		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *drops, *corruptions, *steps, *timeout)
 		log.Printf("Running test instance: %s", instance.Json())
 		testcase, specCh := instance.TestCase()
 		if runSingleTestCase(sysParams, testcase) {

@@ -80,26 +80,24 @@ func (c *ByzzFuzzInstanceConfig) Json() string {
 
 func ByzzFuzzRandom(sp *common.SystemParams,
 	r *rand.Rand,
-	maxDrops int,
-	maxCorruptions int,
-	maxSteps int,
+	nDrops int,
+	nCorruptions int,
+	steps int,
 	timeout time.Duration) ByzzFuzzInstanceConfig {
 
-	nDrops := r.Intn(maxDrops)
 	drops := make([]MessageDrop, nDrops)
 	for i := range drops {
 		drops[i] = MessageDrop{
-			Step: r.Intn(maxSteps),
+			Step: r.Intn(steps),
 			From: r.Intn(sp.N),
 			To:   r.Intn(sp.N),
 		}
 	}
 
 	byzantineNode := r.Intn(sp.N)
-	nCorruptions := r.Intn(maxCorruptions)
 	corruptions := make([]MessageCorruption, nCorruptions)
 	for i := range corruptions {
-		step := r.Intn(maxSteps)
+		step := r.Intn(steps)
 		corruptions[i] = MessageCorruption{
 			Step:       step,
 			From:       byzantineNode,

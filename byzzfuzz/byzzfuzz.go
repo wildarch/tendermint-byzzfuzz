@@ -14,27 +14,12 @@ import (
 
 func ByzzFuzzExpectNewRound(sp *common.SystemParams) (*testlib.TestCase, chan spec.Event) {
 	isolatedValidator := 0
+	otherNodes := []int{1, 2, 3}
 	faulty := 1
 	drops := []MessageDrop{
-		// Drop all Prevote or Precommit to isolatedValidator in round 0
-		{Step: 1, From: 0, To: isolatedValidator},
-		{Step: 1, From: 1, To: isolatedValidator},
-		{Step: 1, From: 2, To: isolatedValidator},
-		{Step: 1, From: 3, To: isolatedValidator},
-		{Step: 2, From: 0, To: isolatedValidator},
-		{Step: 2, From: 1, To: isolatedValidator},
-		{Step: 2, From: 2, To: isolatedValidator},
-		{Step: 2, From: 3, To: isolatedValidator},
-
-		// Drop all Prevote or Precommit from isolatedValidator in round 0
-		{Step: 1, From: isolatedValidator, To: 0},
-		{Step: 1, From: isolatedValidator, To: 1},
-		{Step: 1, From: isolatedValidator, To: 2},
-		{Step: 1, From: isolatedValidator, To: 3},
-		{Step: 2, From: isolatedValidator, To: 0},
-		{Step: 2, From: isolatedValidator, To: 1},
-		{Step: 2, From: isolatedValidator, To: 2},
-		{Step: 2, From: isolatedValidator, To: 3},
+		// Isolate isolatedValidator in round 0
+		{Step: 1, Partition: Partition{{isolatedValidator}, otherNodes}},
+		{Step: 2, Partition: Partition{{isolatedValidator}, otherNodes}},
 	}
 	// Change all votes from faulty to nil
 	allNodes := []int{0, 1, 2, 3}
@@ -88,9 +73,8 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 	drops := make([]MessageDrop, nDrops)
 	for i := range drops {
 		drops[i] = MessageDrop{
-			Step: r.Intn(steps),
-			From: r.Intn(sp.N),
-			To:   r.Intn(sp.N),
+			Step:      r.Intn(steps),
+			Partition: RandomPartition(r),
 		}
 	}
 

@@ -13,9 +13,8 @@ import (
 )
 
 type MessageDrop struct {
-	Step int `json:"step"`
-	From int `json:"from"`
-	To   int `json:"to"`
+	Step      int `json:"step"`
+	Partition Partition
 }
 
 func (d *MessageDrop) MessageType() util.MessageType {
@@ -95,8 +94,7 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 				testlib.IsMessageSend().
 					And(isMessageFromTotalRound(drop.Round())).
 					And(common.IsMessageType(drop.MessageType())).
-					And(common.IsMessageFromPart(nodeLabel(drop.From))).
-					And(common.IsMessageToPart(nodeLabel(drop.To))),
+					And(FromToIsolated(drop.Partition)),
 			).Then(dropMessageLoudly),
 		)
 	}
@@ -158,8 +156,8 @@ func dropMessageLoudly(e *types.Event, c *testlib.Context) (message []*types.Mes
 	m, ok := util.GetMessageFromEvent(e, c)
 	if ok {
 		c.Logger().With(log.LogParams{
-			"from":   m.From,
-			"to":     m.To,
+			"from":   getPartLabel(c, m.From),
+			"to":     getPartLabel(c, m.To),
 			"type":   m.Type,
 			"height": m.Height(),
 			"round":  m.Round(),
@@ -168,4 +166,18 @@ func dropMessageLoudly(e *types.Event, c *testlib.Context) (message []*types.Mes
 		c.Logger().Warn("Dropping message with unknown height/round")
 	}
 	return
+}
+
+func getPartLabel(ctx *testlib.Context, id types.ReplicaID) string {
+	partitionR, ok := ctx.Vars.Get("partition")
+	if !ok {
+		panic("No partition found")
+	}
+	partition := partitionR.(*util.Partition)
+	for _, p := range partition.Parts {
+		if p.Contains(id) {
+			return p.Label
+		}
+	}
+	panic("Replica not found")
 }

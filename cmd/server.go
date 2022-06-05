@@ -76,10 +76,19 @@ func unittest(args []string) {
 	if *useByzzfuzz {
 		testcase, specCh := byzzfuzz.ByzzFuzzExpectNewRound(sysParams)
 		runSingleTestCase(sysParams, testcase)
-		spec.Check(specCh)
+		if spec.Check(specCh) {
+			log.Println("Spec OK")
+		} else {
+			log.Println("Spec FAIL")
+		}
 	} else {
 		runSingleTestCase(sysParams, byzzfuzz.ExpectNewRound(sysParams))
 	}
+}
+
+type testResult struct {
+	agreement bool
+	spec      bool
 }
 
 func fuzz(args []string) {
@@ -95,14 +104,19 @@ func fuzz(args []string) {
 		if runSingleTestCase(sysParams, testcase) {
 			break
 		}
-		spec.Check(specCh)
-		success := testcase.StateMachine.InSuccessState()
-		if success {
-			log.Println("Testcase succesful!")
+		agreementOk := testcase.StateMachine.InSuccessState()
+		if agreementOk {
+			log.Println("Agreement OK")
 		} else {
-			log.Println("Testcase failed")
+			log.Println("Agreement FAIL")
 		}
-		addTestResult(db, instance, success)
+		specOk := spec.Check(specCh)
+		if specOk {
+			log.Println("Spec OK")
+		} else {
+			log.Println("SPEC FAIL")
+		}
+		addTestResult(db, instance, testResult{agreement: agreementOk, spec: specOk})
 	}
 }
 
@@ -115,35 +129,40 @@ func openTestDb() *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS TestResults(
 			config JSON,
-			pass INT,
-			fail INT);
+			agreement BOOL,
+			spec BOOL);
+		CREATE TABLE IF NOT EXISTS SpecLogs(
+			test_id INT,
+			log TEXT);
 	`)
 	if err != nil {
-		log.Fatalf("failed to create test data: %s", err.Error())
+		log.Fatalf("failed to create test database: %s", err.Error())
 	}
 
 	return db
 }
 
-func addTestResult(db *sql.DB, instance byzzfuzz.ByzzFuzzInstanceConfig, success bool) {
-	row := db.QueryRow("SELECT rowid, pass, fail FROM TestResults WHERE config = ?", instance.Json())
-	rowid := 0
-	pass := 0
-	fail := 0
-	err := row.Scan(&rowid, &pass, &fail)
-	if err == sql.ErrNoRows {
-		if success {
-			pass++
-		} else {
-			fail++
-		}
-		_, err = db.Exec("INSERT INTO TestResults VALUES (?, ?, ?)", instance.Json(), pass, fail)
-		if err != nil {
-			log.Fatalf("failed to write to DB")
-		}
-	} else {
-		db.Exec("UPDATE TestResults SET pass=? fail=? WHERE rowid=?", pass, fail, rowid)
+func addTestResult(db *sql.DB, instance byzzfuzz.ByzzFuzzInstanceConfig, result testResult) {
+	res, err := db.Exec("INSERT INTO TestResults VALUES (?, ?, ?)", instance.Json(), result.agreement, result.spec)
+	if err != nil {
+		log.Fatalf("failed to write to DB: %s", err.Error())
 	}
+	rowid, err := res.LastInsertId()
+	if err != nil {
+		log.Fatalf("no rowid returned")
+	}
+
+	// Add spec logs
+	specLogsB, err := os.ReadFile("spec.log")
+	if err != nil {
+		log.Fatalf("failed to read spec logs")
+	}
+	specLogs := string(specLogsB)
+	_, err = db.Exec("INSERT INTO SpecLogs VALUES (?, ?)", rowid, specLogs)
+	if err != nil {
+		log.Fatalf("failed to write spec logs to DB: %s", err.Error())
+	}
+
 }
 
 func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCase) (terminate bool) {

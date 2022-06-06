@@ -126,7 +126,7 @@ func fuzz(args []string) {
 
 func verify(args []string) {
 	verifyCmd.Parse(args)
-	inst := byzzfuzz.Bug006()
+	inst := byzzfuzz.Bug003Reprod()
 
 	testcase, specCh := inst.TestCase()
 	runSingleTestCase(sysParams, testcase)

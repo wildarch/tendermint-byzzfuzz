@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import sys
+import argparse
 
 NODES = [
     "node0",
@@ -42,10 +43,16 @@ def find_actual_steps(events, node):
     return frozenset(actual_steps)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('logfile', type=argparse.FileType('r'), nargs='?', default="spec.log")
+    args = parser.parse_args()
+
     # Read events
-    f = open('spec.log')
+    f = args.logfile 
     events = []
     for line in f:
+        if line == "\n":
+            continue
         e = json.loads(line)
         events.append(e)
 

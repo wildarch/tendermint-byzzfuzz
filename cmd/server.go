@@ -80,6 +80,18 @@ func unittest(args []string) {
 	if *useByzzfuzz {
 		testcase, specCh := byzzfuzz.ByzzFuzzExpectNewRound(sysParams)
 		runSingleTestCase(sysParams, testcase)
+		agreementOk := !(testcase.StateMachine.CurState().Label == byzzfuzz.DiffCommitsLabel)
+		if agreementOk {
+			log.Println("Agreement OK")
+		} else {
+			log.Println("Agreement FAIL")
+		}
+		livenessOk := testcase.StateMachine.InSuccessState()
+		if livenessOk {
+			log.Println("Liveness OK")
+		} else {
+			log.Println("Liveness FAIL")
+		}
 		if spec.Check(specCh) {
 			log.Println("Spec OK")
 		} else {
@@ -93,6 +105,7 @@ func unittest(args []string) {
 type testResult struct {
 	agreement bool
 	spec      bool
+	liveness  bool
 }
 
 func fuzz(args []string) {
@@ -108,11 +121,17 @@ func fuzz(args []string) {
 		if runSingleTestCase(sysParams, testcase) {
 			break
 		}
-		agreementOk := testcase.StateMachine.InSuccessState()
+		agreementOk := !(testcase.StateMachine.CurState().Label == byzzfuzz.DiffCommitsLabel)
 		if agreementOk {
 			log.Println("Agreement OK")
 		} else {
 			log.Println("Agreement FAIL")
+		}
+		livenessOk := testcase.StateMachine.InSuccessState()
+		if livenessOk {
+			log.Println("Liveness OK")
+		} else {
+			log.Println("Liveness FAIL")
 		}
 		specOk := spec.Check(specCh)
 		if specOk {
@@ -120,7 +139,7 @@ func fuzz(args []string) {
 		} else {
 			log.Println("SPEC FAIL")
 		}
-		addTestResult(db, instance, testResult{agreement: agreementOk, spec: specOk})
+		addTestResult(db, instance, testResult{agreement: agreementOk, spec: specOk, liveness: livenessOk})
 	}
 }
 
@@ -130,6 +149,18 @@ func verify(args []string) {
 
 	testcase, specCh := inst.TestCase()
 	runSingleTestCase(sysParams, testcase)
+	agreementOk := !(testcase.StateMachine.CurState().Label == byzzfuzz.DiffCommitsLabel)
+	if agreementOk {
+		log.Println("Agreement OK")
+	} else {
+		log.Println("Agreement FAIL")
+	}
+	livenessOk := testcase.StateMachine.InSuccessState()
+	if livenessOk {
+		log.Println("Liveness OK")
+	} else {
+		log.Println("Liveness FAIL")
+	}
 	if spec.Check(specCh) {
 		log.Println("Spec OK")
 	} else {
@@ -147,7 +178,8 @@ func openTestDb() *sql.DB {
 		CREATE TABLE IF NOT EXISTS TestResults(
 			config JSON,
 			agreement BOOL,
-			spec BOOL);
+			spec BOOL,
+			liveness BOOL);
 		CREATE TABLE IF NOT EXISTS SpecLogs(
 			test_id INT,
 			log TEXT);
@@ -160,7 +192,7 @@ func openTestDb() *sql.DB {
 }
 
 func addTestResult(db *sql.DB, instance byzzfuzz.ByzzFuzzInstanceConfig, result testResult) {
-	res, err := db.Exec("INSERT INTO TestResults VALUES (?, ?, ?)", instance.Json(), result.agreement, result.spec)
+	res, err := db.Exec("INSERT INTO TestResults VALUES (?, ?, ?, ?)", instance.Json(), result.agreement, result.spec, result.liveness)
 	if err != nil {
 		log.Fatalf("failed to write to DB: %s", err.Error())
 	}

@@ -17,6 +17,8 @@ func (c *MessageCorruption) Action() testlib.Action {
 		return changeVoteToNil
 	case ChangeVoteRound:
 		return changeVoteRound
+	case Omit:
+		return testlib.DropMessage()
 	default:
 		panic("Invalid type of corruption")
 	}

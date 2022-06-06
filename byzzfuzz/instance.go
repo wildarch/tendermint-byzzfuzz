@@ -64,15 +64,18 @@ const (
 	ChangeProposalToNil CorruptionType = iota
 	ChangeVoteToNil
 	ChangeVoteRound
+	Omit
 )
 
 var ProposalCorruptionTypes = []CorruptionType{
 	ChangeProposalToNil,
+	Omit,
 }
 
 var VoteCorruptionTypes = []CorruptionType{
 	ChangeVoteToNil,
 	ChangeVoteRound,
+	Omit,
 }
 
 const maxHeight = 3

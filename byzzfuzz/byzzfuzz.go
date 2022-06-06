@@ -71,9 +71,11 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 	timeout time.Duration) ByzzFuzzInstanceConfig {
 
 	drops := make([]MessageDrop, nDrops)
+	// Use a random permutation to avoid two drops for the same step
+	dropSteps := r.Perm(steps)
 	for i := range drops {
 		drops[i] = MessageDrop{
-			Step:      r.Intn(steps),
+			Step:      dropSteps[i],
 			Partition: RandomPartition(r),
 		}
 	}

@@ -1,6 +1,7 @@
 package byzzfuzz
 
 import (
+	"byzzfuzz/liveness"
 	"fmt"
 	"strconv"
 
@@ -77,6 +78,9 @@ func trackTotalRounds(e *types.Event, c *testlib.Context) (messages []*types.Mes
 
 func isMessageFromTotalRound(round int) testlib.Condition {
 	return func(e *types.Event, c *testlib.Context) bool {
+		if liveness.IsTestFinished(c) {
+			return false
+		}
 		if !testlib.IsMessageSend()(e, c) {
 			panic("isMessageFromTotalRound uses the round as perceived by the sender, " +
 				"thus must be used together with isMessageSend")

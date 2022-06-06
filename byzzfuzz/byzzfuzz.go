@@ -41,7 +41,7 @@ func ByzzFuzzExpectNewRound(sp *common.SystemParams) (*testlib.TestCase, chan sp
 		{Step: 14, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 	}
 
-	return ByzzFuzzInst(sp, drops, corruptions, 2*time.Minute)
+	return ByzzFuzzInst(sp, drops, corruptions, 1*time.Minute)
 }
 
 type ByzzFuzzInstanceConfig struct {

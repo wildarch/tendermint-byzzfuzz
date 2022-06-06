@@ -2,6 +2,7 @@ package byzzfuzz
 
 import (
 	"byzzfuzz/byzzfuzz/spec"
+	"byzzfuzz/liveness"
 	"fmt"
 	"time"
 
@@ -80,11 +81,13 @@ var VoteCorruptionTypes = []CorruptionType{
 
 const maxHeight = 3
 
+const DiffCommitsLabel = "diff-commits"
+
 func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []MessageCorruption, timeout time.Duration) (*testlib.TestCase, chan spec.Event) {
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
-	init.MarkSuccess()
-	init.On(spec.DiffCommits, testlib.FailStateLabel)
+	init.On(spec.DiffCommits, DiffCommitsLabel)
+	init.On(common.HeightReached(maxHeight), testlib.SuccessStateLabel)
 
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(trackTotalRounds)
@@ -113,10 +116,10 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 		)
 	}
 
-	filters.AddFilter(testlib.If(common.HeightReached(maxHeight)).Then(endTest))
+	filters.AddFilter(testlib.If(common.HeightReached(maxHeight).And(sm.InState(testlib.SuccessStateLabel))).Then(endTest))
 
-	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout, sm, filters)
-	testcase.SetupFunc(common.Setup(sp, labelNodes))
+	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout+liveness.ExtraTimeout, sm, filters)
+	testcase.SetupFunc(common.Setup(sp, labelNodes, liveness.SetupLivenessTimer(timeout)))
 
 	return testcase, specEventCh
 }

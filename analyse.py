@@ -54,7 +54,9 @@ if __name__ == "__main__":
     found_error = False
     for node in NODES:
         expected_steps = find_expected_steps(events, node)
+        print(f"[{node}] expected steps: {expected_steps}")
         actual_steps = find_actual_steps(events, node)
+        print(f"[{node}] actual steps: {actual_steps}")
 
         # Check for missing steps
         missing_steps = expected_steps - actual_steps

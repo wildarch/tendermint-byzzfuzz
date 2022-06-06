@@ -45,6 +45,8 @@ var testDb = fuzzCmd.String("db", "test_results.sqlite3", "Path to test results 
 var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
 var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on ByzzFuzz instance")
 
+var verifyCmd = flag.NewFlagSet("verify", flag.ExitOnError)
+
 var sysParams = common.NewSystemParams(4)
 
 func main() {
@@ -65,6 +67,8 @@ func main() {
 		unittest(os.Args[commandIndex+1:])
 	case "fuzz":
 		fuzz(os.Args[commandIndex+1:])
+	case "verify":
+		verify(os.Args[commandIndex+1:])
 	default:
 		fmt.Println("expected 'unittest' or 'fuzz' subcommands")
 		os.Exit(1)
@@ -117,6 +121,19 @@ func fuzz(args []string) {
 			log.Println("SPEC FAIL")
 		}
 		addTestResult(db, instance, testResult{agreement: agreementOk, spec: specOk})
+	}
+}
+
+func verify(args []string) {
+	verifyCmd.Parse(args)
+	inst := byzzfuzz.Bug006()
+
+	testcase, specCh := inst.TestCase()
+	runSingleTestCase(sysParams, testcase)
+	if spec.Check(specCh) {
+		log.Println("Spec OK")
+	} else {
+		log.Println("Spec FAIL")
 	}
 }
 

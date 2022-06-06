@@ -85,7 +85,7 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 		corruptions[i] = MessageCorruption{
 			Step:       step,
 			From:       byzantineNode,
-			To:         randomSubset(r, sp.N),
+			To:         randomNonEmptySubset(r, sp.N),
 			Corruption: randomCorruption(r, step),
 		}
 	}
@@ -93,8 +93,8 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 	return ByzzFuzzInstanceConfig{sp, drops, corruptions, timeout}
 }
 
-func randomSubset(r *rand.Rand, n int) []int {
-	subset := r.Perm(n)[0:r.Intn(n)]
+func randomNonEmptySubset(r *rand.Rand, n int) []int {
+	subset := r.Perm(n)[0:(1 + r.Intn(n-1))]
 	sort.Ints(subset)
 	return subset
 }

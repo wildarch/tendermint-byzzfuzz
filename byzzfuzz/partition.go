@@ -11,8 +11,8 @@ import (
 type Partition = [][]int
 
 var allPartitions []Partition = []Partition{
-	// 1 partition
-	{{0, 1, 2, 3}},
+	// 1 partition (disabled because it is equivalent to having no partition at all)
+	// {{0, 1, 2, 3}},
 
 	// 2 partitions
 	{{0, 1}, {2, 3}},

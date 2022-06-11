@@ -88,8 +88,10 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 	init := sm.Builder()
 	init.On(spec.DiffCommits, DiffCommitsLabel)
 	init.On(common.HeightReached(maxHeight), testlib.SuccessStateLabel)
+	init.On(common.IsCommit().And(liveness.IsTestFinished), testlib.SuccessStateLabel)
 
 	filters := testlib.NewFilterSet()
+	filters.AddFilter(testlib.If(sm.InState(testlib.SuccessStateLabel)).Then(endTest))
 	filters.AddFilter(trackTotalRounds)
 	specEventCh := make(chan spec.Event, 10000)
 	filters.AddFilter(spec.Log(specEventCh))
@@ -115,8 +117,6 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 			).Then(corruption.Action()),
 		)
 	}
-
-	filters.AddFilter(testlib.If(common.HeightReached(maxHeight).And(sm.InState(testlib.SuccessStateLabel))).Then(endTest))
 
 	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout+liveness.ExtraTimeout, sm, filters)
 	testcase.SetupFunc(common.Setup(sp, labelNodes, liveness.SetupLivenessTimer(timeout)))

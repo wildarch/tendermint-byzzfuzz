@@ -78,7 +78,7 @@ func trackTotalRounds(e *types.Event, c *testlib.Context) (messages []*types.Mes
 
 func isMessageFromTotalRound(round int) testlib.Condition {
 	return func(e *types.Event, c *testlib.Context) bool {
-		if liveness.IsTestFinished(c) {
+		if liveness.IsTestFinished(e, c) {
 			return false
 		}
 		if !testlib.IsMessageSend()(e, c) {

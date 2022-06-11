@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/netrixframework/netrix/testlib"
+	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/tendermint-testing/common"
 )
 
@@ -23,7 +24,7 @@ func SetupLivenessTimer(timeout time.Duration) common.SetupOption {
 	}
 }
 
-func IsTestFinished(ctx *testlib.Context) bool {
+func IsTestFinished(e *types.Event, ctx *testlib.Context) bool {
 	r, ok := ctx.Vars.GetBool(testFinishedKey)
 	if !ok {
 		return false

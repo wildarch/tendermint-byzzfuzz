@@ -38,7 +38,7 @@ type Event interface {
 
 func Log(ch chan Event) testlib.FilterFunc {
 	return func(e *types.Event, ctx *testlib.Context) (ms []*types.Message, handled bool) {
-		if liveness.IsTestFinished(ctx) {
+		if liveness.IsTestFinished(e, ctx) {
 			return
 		}
 		// Handle message

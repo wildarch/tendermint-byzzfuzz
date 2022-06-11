@@ -28,8 +28,8 @@ func Bug003Reprod() ByzzFuzzInstanceConfig {
 	return ByzzFuzzInstanceConfig{
 		sysParams: sysParams,
 		Drops: []MessageDrop{
-			{Step: 3, Partition: Partition{{0}, {2}, {1, 3}}},
 			{Step: 2, Partition: Partition{{3}, {0, 1, 2}}},
+			{Step: 3, Partition: Partition{{0}, {2}, {1, 3}}},
 		},
 		Corruptions: []MessageCorruption{},
 		Timeout:     time.Minute,

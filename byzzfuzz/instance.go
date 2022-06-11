@@ -91,6 +91,8 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 	specEventCh := make(chan spec.Event, 10000)
 	filters.AddFilter(spec.Log(specEventCh))
 
+	filters.AddFilter(logConsensusMessages)
+
 	for _, drop := range drops {
 		filters.AddFilter(
 			testlib.If(

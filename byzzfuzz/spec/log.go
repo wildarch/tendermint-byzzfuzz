@@ -42,7 +42,7 @@ func Log(ch chan Event) testlib.FilterFunc {
 			message, ok := util.GetMessageFromEvent(e, ctx)
 			if ok {
 				height, round := message.HeightRound()
-				if round >= 0 {
+				if round >= 0 && (message.Type == util.Prevote || message.Type == util.Precommit) {
 					ch <- &MessageEvent{
 						From:   getPartLabel(ctx, message.From),
 						To:     getPartLabel(ctx, message.To),

@@ -220,7 +220,7 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 
 	go func() {
 		time.Sleep(5 * time.Second)
-		log.Printf("Starting nodes")
+		server.Logger.Info("Starting nodes")
 		err = dockerCompose.Start()
 		if err != nil {
 			log.Fatalf("Failed to start nodes: %v", err)
@@ -242,7 +242,7 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 	// Returns once the server has been stopped
 	server.Start()
 
-	log.Printf("Stopping nodes...")
+	server.Logger.Info("Stopping nodes")
 	dockerCompose.Process.Signal(syscall.SIGTERM)
 	dockerCompose.Wait()
 

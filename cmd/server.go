@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -259,6 +260,34 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 		}
 	}()
 
+	stopRequests := make(chan bool)
+	go func() {
+		for i := 0; ; i++ {
+			time.Sleep(5 * time.Second)
+			select {
+			case <-stopRequests:
+				return
+			default:
+			}
+			res, err := http.Get(fmt.Sprintf("http://localhost:26657/broadcast_tx_commit?tx=\"name=satoshi%d\"", time.Now().UnixNano()))
+			if err != nil {
+				log.Printf("Error sending request: %s", err.Error())
+				continue
+			}
+
+			log.Printf("Request status: %s", res.Status)
+			/*
+				bodyB, err := io.ReadAll(res.Body)
+				if err != nil {
+					log.Fatalf("Failed to read response: %s", err.Error())
+				}
+				log.Printf("Response: %s", string(bodyB))
+				defer res.Body.Close()
+			*/
+
+		}
+	}()
+
 	doneCh := server.Done()
 	terminate = false
 	go func() {
@@ -266,9 +295,13 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 		case <-termCh:
 			terminate = true
 			server.Stop()
+			stopRequests <- true
 		case <-doneCh:
 			server.Stop()
+			stopRequests <- true
 		}
+
+		close(stopRequests)
 	}()
 
 	// Returns once the server has been stopped

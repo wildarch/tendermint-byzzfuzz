@@ -89,8 +89,7 @@ func isMessageFromTotalRound(round int) testlib.Condition {
 			return false
 		}
 
-		totalRounds, ok := c.Vars.GetInt(
-			totalRoundForHeightRoundKey(e.Replica, message.Height(), message.Round()))
+		totalRounds, ok := c.Vars.GetInt(totalRoundsKey(e.Replica))
 		if !ok {
 			// This can happen if the node is byzantine and produces a message for an invalid round
 			return false

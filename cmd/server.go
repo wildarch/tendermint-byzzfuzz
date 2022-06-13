@@ -146,7 +146,7 @@ func fuzz(args []string) {
 
 func verify(args []string) {
 	verifyCmd.Parse(args)
-	inst := byzzfuzz.Lagging()
+	inst := byzzfuzz.Bug003()
 
 	testcase, specCh := inst.TestCase()
 	runSingleTestCase(sysParams, testcase)

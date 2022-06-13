@@ -1,7 +1,6 @@
 package spec
 
 import (
-	"byzzfuzz/liveness"
 	"strconv"
 
 	"github.com/netrixframework/netrix/testlib"
@@ -38,9 +37,6 @@ type Event interface {
 
 func Log(ch chan Event) testlib.FilterFunc {
 	return func(e *types.Event, ctx *testlib.Context) (ms []*types.Message, handled bool) {
-		if liveness.IsTestFinished(e, ctx) {
-			return
-		}
 		// Handle message
 		if testlib.IsMessageReceive()(e, ctx) {
 			message, ok := util.GetMessageFromEvent(e, ctx)

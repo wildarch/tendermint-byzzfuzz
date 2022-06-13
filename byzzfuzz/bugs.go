@@ -36,6 +36,19 @@ func Bug003Reprod() ByzzFuzzInstanceConfig {
 	}
 }
 
+func Lagging() ByzzFuzzInstanceConfig {
+	return ByzzFuzzInstanceConfig{
+		sysParams: sysParams,
+		Drops: []MessageDrop{
+			{Step: 2, Partition: Partition{{3}, {0, 1, 2}}},
+			{Step: 5, Partition: Partition{{3}, {0, 1, 2}}},
+			{Step: 8, Partition: Partition{{3}, {0, 1, 2}}},
+		},
+		Corruptions: []MessageCorruption{},
+		Timeout:     time.Minute,
+	}
+}
+
 func makeConfig(bug string) ByzzFuzzInstanceConfig {
 	instconf := ByzzFuzzInstanceConfig{}
 	err := json.Unmarshal([]byte(bug), &instconf)

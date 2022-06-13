@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -42,6 +41,7 @@ var corruptions = fuzzCmd.Int("corruptions", defaultMaxCorruptions, "Bound on th
 var steps = fuzzCmd.Int("steps", defaultMaxSteps, "Bound on the number of protocol consensus steps")
 var timeout = fuzzCmd.Duration("timeout", 1*time.Minute, "Timeout per test instance")
 var testDb = fuzzCmd.String("db", "test_results.sqlite3", "Path to test results output file")
+var iterations = fuzzCmd.Int("iterations", 10000, "Number of iterations to run for")
 
 var unittestCmd = flag.NewFlagSet("unittest", flag.ExitOnError)
 var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on ByzzFuzz instance")
@@ -115,7 +115,7 @@ func fuzz(args []string) {
 	db := openTestDb()
 	_ = db
 
-	for {
+	for i := 0; i < *iterations; i++ {
 		instance := byzzfuzz.ByzzFuzzRandom(sysParams, r, *drops, *corruptions, *steps, *timeout)
 		log.Printf("Running test instance: %s", instance.Json())
 		testcase, specCh := instance.TestCase()
@@ -146,7 +146,7 @@ func fuzz(args []string) {
 
 func verify(args []string) {
 	verifyCmd.Parse(args)
-	inst := byzzfuzz.Bug003Reprod()
+	inst := byzzfuzz.Lagging()
 
 	testcase, specCh := inst.TestCase()
 	runSingleTestCase(sysParams, testcase)
@@ -260,33 +260,26 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 		}
 	}()
 
-	stopRequests := make(chan bool)
-	go func() {
-		for i := 0; ; i++ {
-			time.Sleep(5 * time.Second)
-			select {
-			case <-stopRequests:
-				return
-			default:
-			}
-			res, err := http.Get(fmt.Sprintf("http://localhost:26657/broadcast_tx_commit?tx=\"name=satoshi%d\"", time.Now().UnixNano()))
-			if err != nil {
-				log.Printf("Error sending request: %s", err.Error())
-				continue
-			}
-
-			log.Printf("Request status: %s", res.Status)
-			/*
-				bodyB, err := io.ReadAll(res.Body)
-				if err != nil {
-					log.Fatalf("Failed to read response: %s", err.Error())
+	//stopRequests := make(chan bool)
+	/*
+		go func() {
+			for i := 0; ; i++ {
+				time.Sleep(5 * time.Second)
+				select {
+				case <-stopRequests:
+					return
+				default:
 				}
-				log.Printf("Response: %s", string(bodyB))
-				defer res.Body.Close()
-			*/
+				res, err := http.Get(fmt.Sprintf("http://localhost:26657/broadcast_tx_commit?tx=\"name=satoshi%d\"", time.Now().UnixNano()))
+				if err != nil {
+					log.Printf("Error sending request: %s", err.Error())
+					continue
+				}
 
-		}
-	}()
+				log.Printf("Request status: %s", res.Status)
+			}
+		}()
+	*/
 
 	doneCh := server.Done()
 	terminate = false
@@ -295,13 +288,13 @@ func runSingleTestCase(sysParams *common.SystemParams, testcase *testlib.TestCas
 		case <-termCh:
 			terminate = true
 			server.Stop()
-			stopRequests <- true
+			//stopRequests <- true
 		case <-doneCh:
 			server.Stop()
-			stopRequests <- true
+			//stopRequests <- true
 		}
 
-		close(stopRequests)
+		//close(stopRequests)
 	}()
 
 	// Returns once the server has been stopped

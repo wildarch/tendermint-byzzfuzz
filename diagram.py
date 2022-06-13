@@ -2,6 +2,7 @@
 import json
 from dataclasses import dataclass
 import tkinter as tk
+import subprocess
 
 @dataclass(eq=True, frozen=True)
 class Event:
@@ -73,15 +74,16 @@ NODE_HEIGHT = {
 }
 
 window = tk.Tk()
-window.geometry("1200x300")
+window.geometry("2400x300")
 
-canvas = tk.Canvas(window, width=1200, height=300)
+canvas = tk.Canvas(window, width=2400, height=300)
 canvas.pack()
 
 x_off = 0
 for (height, round) in rounds:
+    canvas.create_text(x_off+150, 240, text=f"H={height}/R={round}")
     for step in ["Proposal", "Prevote", "Precommit"]:
-        print(f"H={height}/R={round}/S={step}")
+        canvas.create_text(x_off+50, 220, text=step)
 
         for event in events:
             if event.is_receive or event.msg_type != step or event.height != height or event.round != round:
@@ -91,7 +93,10 @@ for (height, round) in rounds:
             else:
                 canvas.create_line(x_off, NODE_HEIGHT[event.sent_from], x_off+100, NODE_HEIGHT[event.sent_to], arrow=tk.LAST, dash=(5,2))
         x_off += 100
+    x_off += 50
 
-
+canvas.update()
+canvas.postscript(file="diagram.ps")
+subprocess.run(["ps2pdf", "-dEPSCrop", "diagram.ps"])
 
 window.mainloop()

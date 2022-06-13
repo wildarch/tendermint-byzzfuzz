@@ -1,3 +1,6 @@
 third_party/
 *.log
 *.sqlite3
+
+diagram.pdf
+diagram.ps

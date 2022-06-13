@@ -3,6 +3,7 @@ package byzzfuzz
 import (
 	"byzzfuzz/byzzfuzz/spec"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/netrixframework/netrix/log"
@@ -180,7 +181,7 @@ func getPartLabel(ctx *testlib.Context, id types.ReplicaID) string {
 	}
 	partition := partitionR.(*util.Partition)
 	for _, p := range partition.Parts {
-		if p.Contains(id) {
+		if strings.HasPrefix(p.Label, "node") && p.Contains(id) {
 			return p.Label
 		}
 	}

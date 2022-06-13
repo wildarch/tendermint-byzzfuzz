@@ -1,11 +1,10 @@
 package byzzfuzz
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/netrixframework/netrix/log"
 	"github.com/netrixframework/netrix/testlib"
-	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/tendermint-testing/common"
 	"github.com/netrixframework/tendermint-testing/util"
 )
@@ -40,26 +39,13 @@ func ExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
 	)
 
 	filters := testlib.NewFilterSet()
+	filters.AddFilter(logConsensusMessages)
 	filters.AddFilter(
 		testlib.If(
 			testlib.IsMessageSend().
 				And(common.IsVoteFromFaulty()),
 		).Then(
 			common.ChangeVoteToNil(),
-			func(e *types.Event, c *testlib.Context) (ms []*types.Message) {
-				m, ok := c.GetMessage(e)
-				if !ok {
-					return []*types.Message{}
-				}
-				message, ok := util.GetParsedMessage(m)
-				if !ok {
-					return []*types.Message{}
-				}
-				if ok {
-					fmt.Printf("ChangeVoteToNil H=%d/R=%d %s %s -> %s [%s]\n", message.Height(), message.Round(), message.Type, message.From, message.To, e.Replica)
-				}
-				return
-			},
 		),
 	)
 	filters.AddFilter(
@@ -74,10 +60,6 @@ func ExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
 				),
 		).Then(
 			testlib.Count("round1ToH").Incr(),
-			func(e *types.Event, c *testlib.Context) (ms []*types.Message) {
-				fmt.Printf("+1 to H (dropped)\n")
-				return
-			},
 		),
 	)
 	filters.AddFilter(
@@ -88,20 +70,6 @@ func ExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
 				And(common.IsMessageType(util.Prevote).Or(common.IsMessageType(util.Precommit))),
 		).Then(
 			testlib.DropMessage(),
-			func(e *types.Event, c *testlib.Context) (ms []*types.Message) {
-				m, ok := c.GetMessage(e)
-				if !ok {
-					return []*types.Message{}
-				}
-				message, ok := util.GetParsedMessage(m)
-				if !ok {
-					return []*types.Message{}
-				}
-				if ok {
-					fmt.Printf("Drop H=%d/R=%d %s %s -> %s\n", message.Height(), message.Round(), message.Type, message.From, message.To)
-				}
-				return
-			},
 		),
 	)
 	filters.AddFilter(
@@ -111,20 +79,6 @@ func ExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
 				And(common.IsVoteFromPart("h")),
 		).Then(
 			testlib.DropMessage(),
-			func(e *types.Event, c *testlib.Context) (ms []*types.Message) {
-				m, ok := c.GetMessage(e)
-				if !ok {
-					return []*types.Message{}
-				}
-				message, ok := util.GetParsedMessage(m)
-				if !ok {
-					return []*types.Message{}
-				}
-				if ok {
-					fmt.Printf("Drop H=%d/R=%d %s %s -> %s\n", message.Height(), message.Round(), message.Type, message.From, message.To)
-				}
-				return
-			},
 		),
 	)
 
@@ -134,6 +88,38 @@ func ExpectNewRound(sp *common.SystemParams) *testlib.TestCase {
 		sm,
 		filters,
 	)
-	testcase.SetupFunc(common.Setup(sp))
+	testcase.SetupFunc(common.Setup(sp, labelNodesExpectNewRound))
 	return testcase
+}
+
+func labelNodesExpectNewRound(c *testlib.Context) {
+	parts := make([]*util.Part, len(c.Replicas.Iter())+2)
+	for i, replica := range c.Replicas.Iter() {
+		replicaSet := util.NewReplicaSet()
+		replicaSet.Add(replica)
+		parts[i] = &util.Part{
+			ReplicaSet: replicaSet,
+			Label:      nodeLabel(i),
+		}
+	}
+
+	hReplicaSet := util.NewReplicaSet()
+	hReplicaSet.Add(c.Replicas.Iter()[0])
+	parts[len(c.Replicas.Iter())] = &util.Part{
+		ReplicaSet: hReplicaSet,
+		Label:      "h",
+	}
+
+	faultyReplicaSet := util.NewReplicaSet()
+	faultyReplicaSet.Add(c.Replicas.Iter()[1])
+	parts[len(c.Replicas.Iter())+1] = &util.Part{
+		ReplicaSet: faultyReplicaSet,
+		Label:      "faulty",
+	}
+
+	partition := util.NewPartition(parts...)
+	c.Vars.Set("partition", partition)
+	c.Logger().With(log.LogParams{
+		"partition": partition.String(),
+	}).Info("Partitioned replicas")
 }

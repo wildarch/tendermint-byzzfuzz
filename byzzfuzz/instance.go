@@ -84,7 +84,13 @@ const maxHeight = 3
 
 const DiffCommitsLabel = "diff-commits"
 
-func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []MessageCorruption, timeout time.Duration) (*testlib.TestCase, chan spec.Event) {
+func ByzzFuzzInst(
+	sp *common.SystemParams,
+	drops []MessageDrop,
+	corruptions []MessageCorruption,
+	timeout time.Duration,
+	livenessTimeout time.Duration) (*testlib.TestCase, chan spec.Event) {
+
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
 	init.On(spec.DiffCommits, DiffCommitsLabel)
@@ -121,7 +127,7 @@ func ByzzFuzzInst(sp *common.SystemParams, drops []MessageDrop, corruptions []Me
 		)
 	}
 
-	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout+liveness.ExtraTimeout, sm, filters)
+	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout+livenessTimeout, sm, filters)
 	testcase.SetupFunc(common.Setup(sp, labelNodes, liveness.SetupLivenessTimer(timeout)))
 
 	return testcase, specEventCh

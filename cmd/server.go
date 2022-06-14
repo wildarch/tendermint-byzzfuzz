@@ -50,6 +50,7 @@ var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on
 var verifyCmd = flag.NewFlagSet("verify", flag.ExitOnError)
 
 var runInstanceCmd = flag.NewFlagSet("run-instance", flag.ExitOnError)
+var livenessTimeout = runInstanceCmd.Duration("liveness-timeout", 1*time.Minute, "Time to wait for a new commit after the network heals, to verify liveness")
 
 var sysParams = common.NewSystemParams(4)
 
@@ -89,6 +90,7 @@ func runInstance(args []string) {
 	if err != nil {
 		log.Fatalf("failed to parse JSON definition for instance: %s", err.Error())
 	}
+	instConf.LivenessTimeout = *livenessTimeout
 	testcase, specCh := instConf.TestCase()
 
 	confB, err := json.Marshal(instConf)

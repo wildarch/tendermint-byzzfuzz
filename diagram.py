@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass
 import tkinter as tk
 import subprocess
+import argparse
 
 @dataclass(eq=True, frozen=True)
 class Event:
@@ -14,24 +15,27 @@ class Event:
     height: int
     round: int
 
+parser = argparse.ArgumentParser()
+parser.add_argument('logfile', type=argparse.FileType('r'))
+args = parser.parse_args()
+
 events = set()
 
-with open("server.log", "r") as logfile:
-    for event in logfile:
-        try:
-            e = json.loads(event)
-            if "msg" in e and e["msg"] == "Consensus message":
-                events.add(Event(
-                    e["is_receive"], 
-                    e["is_send"], 
-                    e["sent_from"], 
-                    e["sent_to"], 
-                    e["type"], 
-                    e["height"], 
-                    e["round"],
-                ))
-        except json.JSONDecodeError:
-            print("Cannot parse line: ", event)
+for event in args.logfile:
+    try:
+        e = json.loads(event)
+        if "msg" in e and e["msg"] == "Consensus message":
+            events.add(Event(
+                e["is_receive"], 
+                e["is_send"], 
+                e["sent_from"], 
+                e["sent_to"], 
+                e["type"], 
+                e["height"], 
+                e["round"],
+            ))
+    except json.JSONDecodeError:
+        print("Cannot parse line: ", event)
 
 rounds = set()
 for e in events:

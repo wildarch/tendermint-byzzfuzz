@@ -54,7 +54,7 @@ MAX_STEPS = 10
 ALL_DROPS = [MessageDrop(step, part) for step, part in itertools.product(range(MAX_STEPS), ALL_PARTITIONS)]
 
 def run_instance(config):
-    proc = subprocess.Popen(["go", "run", "./cmd/server.go", "run-instance"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(["go", "run", "./cmd/server.go", "run-instance", "--liveness-timeout=5m"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     js = json.dumps(dataclasses.asdict(config))
     proc.stdin.write(bytes(js, "utf-8"))
     proc.stdin.flush()
@@ -77,7 +77,7 @@ def run_instance(config):
     return events
 
 for i, drop in enumerate(ALL_DROPS):
-    logpath = f"drop1/events{i:03}.log"
+    logpath = f"drop1_5m/events{i:03}.log"
     if os.path.isfile(logpath):
         print("Skip already processed: ", drop)
         continue

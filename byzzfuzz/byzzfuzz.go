@@ -42,7 +42,7 @@ func ByzzFuzzExpectNewRound(sp *common.SystemParams) (*testlib.TestCase, chan sp
 		{Step: 14, From: faulty, To: allNodes, Corruption: ChangeVoteToNil},
 	}
 
-	return ByzzFuzzInst(sp, drops, corruptions, 1*time.Minute)
+	return ByzzFuzzInst(sp, drops, corruptions, time.Minute, time.Minute)
 }
 
 func InstanceFromJson(r io.Reader) (ByzzFuzzInstanceConfig, error) {
@@ -54,18 +54,20 @@ func InstanceFromJson(r io.Reader) (ByzzFuzzInstanceConfig, error) {
 	}
 	instconf.sysParams = sysParams
 	instconf.Timeout = 1 * time.Minute
+	instconf.LivenessTimeout = 1 * time.Minute
 	return instconf, nil
 }
 
 type ByzzFuzzInstanceConfig struct {
-	sysParams   *common.SystemParams
-	Drops       []MessageDrop       `json:"drops"`
-	Corruptions []MessageCorruption `json:"corruptions"`
-	Timeout     time.Duration       `json:"timeout"`
+	sysParams       *common.SystemParams
+	Drops           []MessageDrop       `json:"drops"`
+	Corruptions     []MessageCorruption `json:"corruptions"`
+	Timeout         time.Duration       `json:"timeout"`
+	LivenessTimeout time.Duration       `json:"liveness_timeout"`
 }
 
 func (c *ByzzFuzzInstanceConfig) TestCase() (*testlib.TestCase, chan spec.Event) {
-	return ByzzFuzzInst(c.sysParams, c.Drops, c.Corruptions, c.Timeout)
+	return ByzzFuzzInst(c.sysParams, c.Drops, c.Corruptions, c.Timeout, c.LivenessTimeout)
 }
 
 func (c *ByzzFuzzInstanceConfig) Json() string {
@@ -105,7 +107,7 @@ func ByzzFuzzRandom(sp *common.SystemParams,
 		}
 	}
 
-	return ByzzFuzzInstanceConfig{sp, drops, corruptions, timeout}
+	return ByzzFuzzInstanceConfig{sp, drops, corruptions, timeout, time.Minute}
 }
 
 func randomNonEmptySubset(r *rand.Rand, n int) []int {

@@ -5,6 +5,7 @@ import itertools
 import subprocess
 import json
 import sys
+import os
 
 @dataclass(eq=True, order=True)
 class MessageDrop:
@@ -50,7 +51,7 @@ ALL_PARTITIONS = [
 ]
 
 MAX_STEPS = 10
-#ALL_DROPS = [MessageDrop(step, part) for step, part in itertools.product(range(MAX_STEPS), ALL_PARTITIONS)]
+ALL_DROPS = [MessageDrop(step, part) for step, part in itertools.product(range(MAX_STEPS), ALL_PARTITIONS)]
 
 def run_instance(config):
     proc = subprocess.Popen(["go", "run", "./cmd/server.go", "run-instance"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -59,22 +60,33 @@ def run_instance(config):
     proc.stdin.flush()
 
     print("Process starts")
+    events = []
     for line in iter(proc.stderr.readline,''):
         line = line.decode("utf-8")
         sys.stdout.write(line)
 
         event = json.loads(line)
+        events.append(event)
         if "msg" in event and event["msg"] == "Testcase succeeded" or event["msg"] == "Testcase failed":
             try:
                 proc.wait(30)
             except subprocess.TimeoutExpired:
-                print("WARN: Timeout expired, killing instead")
-                proc.kill()
+                print("WARN: Timeout expired, terminating")
+                proc.terminate()
             break
+    return events
 
-inst = ByzzFuzzInstanceConfig([
-    MessageDrop(0, [[0], [1, 2, 3]])
-], [])
+for i, drop in enumerate(ALL_DROPS):
+    logpath = f"drop1/events{i:03}.log"
+    if os.path.isfile(logpath):
+        print("Skip already processed: ", drop)
+        continue
 
-res = run_instance(inst)
-print(res)
+    inst = ByzzFuzzInstanceConfig([drop], []) 
+    print(f"Run instance: {inst}")
+    events = run_instance(inst)
+
+    with open(logpath, 'w') as logfile:
+        for e in events:
+            json.dump(e, logfile)
+            logfile.write('\n')

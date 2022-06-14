@@ -4,6 +4,7 @@ import (
 	"byzzfuzz/byzzfuzz"
 	"byzzfuzz/byzzfuzz/spec"
 	"byzzfuzz/docker"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -48,6 +49,8 @@ var useByzzfuzz = unittestCmd.Bool("use-byzzfuzz", true, "Run unit test based on
 
 var verifyCmd = flag.NewFlagSet("verify", flag.ExitOnError)
 
+var runInstanceCmd = flag.NewFlagSet("run-instance", flag.ExitOnError)
+
 var sysParams = common.NewSystemParams(4)
 
 func main() {
@@ -70,9 +73,41 @@ func main() {
 		fuzz(os.Args[commandIndex+1:])
 	case "verify":
 		verify(os.Args[commandIndex+1:])
+	case "run-instance":
+		runInstance(os.Args[commandIndex+1:])
 	default:
 		fmt.Println("expected 'unittest' or 'fuzz' subcommands")
 		os.Exit(1)
+	}
+}
+
+func runInstance(args []string) {
+	runInstanceCmd.Parse(args)
+
+	// Read testcase from stdin
+	instConf, err := byzzfuzz.InstanceFromJson(os.Stdin)
+	if err != nil {
+		log.Fatalf("failed to parse JSON definition for instance: %s", err.Error())
+	}
+	testcase, specCh := instConf.TestCase()
+
+	confB, err := json.Marshal(instConf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	confB = append(confB, byte('\n'))
+	_, err = os.Stdout.Write(confB)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	runSingleTestCase(sysParams, testcase)
+
+	// TODO remove
+	// Drain the spec channel, not used
+	close(specCh)
+	for len(specCh) > 0 {
+		<-specCh
 	}
 }
 

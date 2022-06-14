@@ -3,6 +3,7 @@ package byzzfuzz
 import (
 	"byzzfuzz/byzzfuzz/spec"
 	"encoding/json"
+	"io"
 	"log"
 	"math/rand"
 	"sort"
@@ -42,6 +43,18 @@ func ByzzFuzzExpectNewRound(sp *common.SystemParams) (*testlib.TestCase, chan sp
 	}
 
 	return ByzzFuzzInst(sp, drops, corruptions, 1*time.Minute)
+}
+
+func InstanceFromJson(r io.Reader) (ByzzFuzzInstanceConfig, error) {
+	instconf := ByzzFuzzInstanceConfig{}
+	decoder := json.NewDecoder(r)
+	err := decoder.Decode(&instconf)
+	if err != nil {
+		return instconf, err
+	}
+	instconf.sysParams = sysParams
+	instconf.Timeout = 1 * time.Minute
+	return instconf, nil
 }
 
 type ByzzFuzzInstanceConfig struct {

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import tkinter as tk
 import subprocess
 import argparse
+from data import *
+import re
 
 @dataclass(eq=True, frozen=True)
 class Event:
@@ -18,6 +20,11 @@ class Event:
 parser = argparse.ArgumentParser()
 parser.add_argument('logfile', type=argparse.FileType('r'))
 args = parser.parse_args()
+
+match = re.match(r".*events(\d\d\d).log", args.logfile.name)
+if match is not None:
+    num = int(match.group(1))
+    print(ALL_DROPS[num])
 
 events = set()
 

@@ -98,7 +98,7 @@ func runInstance(args []string) {
 		log.Fatal(err)
 	}
 	confB = append(confB, byte('\n'))
-	_, err = os.Stdout.Write(confB)
+	_, err = os.Stderr.Write(confB)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func fuzz(args []string) {
 
 func verify(args []string) {
 	verifyCmd.Parse(args)
-	inst := byzzfuzz.Bug003()
+	inst := byzzfuzz.Lagging()
 
 	testcase, specCh := inst.TestCase()
 	runSingleTestCase(sysParams, testcase)

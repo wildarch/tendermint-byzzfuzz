@@ -10,8 +10,8 @@ class MessageDrop:
 class CorruptionType(IntEnum):
 	CHANGE_PROPOSAL_TO_NIL = 0
 	CHANGE_VOTE_TO_NIL = 1
-	CHANGE_VOTE_ROUND = 1
-	OMIT = 2
+	CHANGE_VOTE_ROUND = 2
+	OMIT = 3
 
 @dataclass(eq=True, order=True)
 class MessageCorruption:

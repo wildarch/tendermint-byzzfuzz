@@ -9,6 +9,7 @@ import sys
 import os
 import random
 import sqlite3
+import argparse
 
 def run_instance(config, liveness_timeout="1m"):
     proc = subprocess.Popen(["go", "run", "./cmd/server.go", "run-instance", f"--liveness-timeout={liveness_timeout}"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -117,13 +118,12 @@ def check_ok(events):
             success = False
     return success
 
-
-if __name__ == "__main__":
+def fuzz(args):
     conn = create_db()
     cur = conn.cursor()
 
     while True:
-        config = random_config(1, 1)
+        config = random_config(args.drops, args.corruptions)
         events = run_instance(config)
 
         passed = 0
@@ -141,5 +141,37 @@ if __name__ == "__main__":
 
         dump_events(f"logs/events{rowid:06}.log", events)
 
-    conn.close()
-    
+def parse_config(json_config):
+    c = json.loads(json_config)
+    return ByzzFuzzInstanceConfig(
+        [MessageDrop(**d) for d in c["drops"]],
+        [MessageCorruption(**c) for c in c["corruptions"]]
+    )
+
+def deflake(args):
+    conn = create_db()
+    cur = conn.cursor()
+
+    while True:
+        cur.execute("select config from TestResults ORDER BY pass+fail ASC LIMIT 1")
+        json_config = cur.fetchone()[0]
+        config = parse_config(json_config)
+        print(config)
+        break
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+    subparsers.required = True
+    subparsers.dest = "commmand"
+
+    parser_fuzz = subparsers.add_parser("fuzz")
+    parser_fuzz.set_defaults(func=fuzz)
+    parser_fuzz.add_argument("--drops", type=int, default=1)
+    parser_fuzz.add_argument("--corruptions", type=int, default=0)
+
+    parser_deflake = subparsers.add_parser("deflake")
+    parser_deflake.set_defaults(func=deflake)
+
+    args = parser.parse_args()
+    args.func(args)

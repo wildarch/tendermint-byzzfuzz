@@ -15,8 +15,8 @@ import (
 )
 
 type MessageDrop struct {
-	Step      int `json:"step"`
-	Partition Partition
+	Step      int       `json:"step"`
+	Partition Partition `json:"partition"`
 }
 
 func (d *MessageDrop) MessageType() util.MessageType {
@@ -38,8 +38,8 @@ func (d *MessageDrop) Round() int {
 
 type MessageCorruption struct {
 	Step       int            `json:"step"`
-	From       int            `json:"from"`
-	To         []int          `json:"to"`
+	From       int            `json:"from_node"`
+	To         []int          `json:"to_nodes"`
 	Corruption CorruptionType `json:"corruption_type"`
 }
 

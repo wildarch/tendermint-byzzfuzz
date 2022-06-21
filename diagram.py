@@ -31,6 +31,8 @@ events = set()
 for event in args.logfile:
     try:
         e = json.loads(event)
+        if "drops" in e:
+            print(e)
         if "msg" in e and e["msg"] == "Consensus message":
             events.add(Event(
                 e["is_receive"], 

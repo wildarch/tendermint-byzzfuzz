@@ -26,9 +26,11 @@ if match is not None:
     num = int(match.group(1))
     print(ALL_DROPS[num])
 
-retransmitted_events = set()
 events = set()
+retransmitted_events = set()
+corrupted_events = {}
 
+last_event = None
 for event in args.logfile:
     try:
         e = json.loads(event)
@@ -44,10 +46,15 @@ for event in args.logfile:
                 e["height"], 
                 e["round"],
             )
+            last_event = event
             if event in events:
                 retransmitted_events.add(event)
             else:
                 events.add(event)
+        if "msg" in e and e["msg"] == "Corruption":
+            # Previous send was corrupted
+            corrupted_events[last_event] = e["type"]
+
     except json.JSONDecodeError:
         print("Cannot parse line: ", event)
 
@@ -106,15 +113,23 @@ for (height, round) in rounds:
         for event in events:
             if event.is_receive or event.msg_type != step or event.height != height or event.round != round:
                 continue
+            fill = 'black'
+            if event in retransmitted_events:
+                fill = 'blue'
+            if event in corrupted_events:
+                fill = 'red'
             if is_received(event):
-                canvas.create_line(x_off, NODE_HEIGHT[event.sent_from], x_off+100, NODE_HEIGHT[event.sent_to], arrow=tk.LAST, width=3)
+                canvas.create_line(x_off, NODE_HEIGHT[event.sent_from], x_off+100, NODE_HEIGHT[event.sent_to], arrow=tk.LAST, width=3, fill=fill)
             else:
-                canvas.create_line(x_off, NODE_HEIGHT[event.sent_from], x_off+100, NODE_HEIGHT[event.sent_to], arrow=tk.LAST, dash=(5,2))
+                canvas.create_line(x_off, NODE_HEIGHT[event.sent_from], x_off+100, NODE_HEIGHT[event.sent_to], arrow=tk.LAST, width=3, dash=(5,2), fill=fill)
         x_off += 100
     x_off += 50
 
 canvas.update()
 canvas.postscript(file="diagram.ps")
 subprocess.run(["ps2pdf", "-dEPSCrop", "diagram.ps"])
+
+for e in sorted(corrupted_events):
+    print(f"Corrupted event: {e} ({corrupted_events[e]})")
 
 window.mainloop()

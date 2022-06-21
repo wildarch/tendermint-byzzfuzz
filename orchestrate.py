@@ -123,23 +123,26 @@ def fuzz(args):
     cur = conn.cursor()
 
     while True:
-        config = random_config(args.drops, args.corruptions)
-        events = run_instance(config)
+        fuzz_one(cur, args)
 
-        passed = 0
-        failed = 0
-        if check_ok(events):
-            passed = 1
-        else:
-            failed = 1
+def fuzz_one(cur, args):
+    config = random_config(args.drops, args.corruptions)
+    events = run_instance(config)
 
-        json_config = json.dumps(dataclasses.asdict(config))
-        cur.execute('''
-            INSERT INTO TestResults VALUES (?, ?, ?)
-        ''', (json_config, passed, failed))
-        rowid = cur.lastrowid
+    passed = 0
+    failed = 0
+    if check_ok(events):
+        passed = 1
+    else:
+        failed = 1
 
-        dump_events(f"logs/events{rowid:06}.log", events)
+    json_config = json.dumps(dataclasses.asdict(config))
+    cur.execute('''
+        INSERT INTO TestResults VALUES (?, ?, ?)
+    ''', (json_config, passed, failed))
+    rowid = cur.lastrowid
+
+    dump_events(f"logs/events{rowid:06}.log", events)
 
 def parse_config(json_config):
     c = json.loads(json_config)
@@ -153,11 +156,32 @@ def deflake(args):
     cur = conn.cursor()
 
     while True:
-        cur.execute("select config from TestResults ORDER BY pass+fail ASC LIMIT 1")
-        json_config = cur.fetchone()[0]
-        config = parse_config(json_config)
-        print(config)
-        break
+        deflake_one(cur, args)
+
+def deflake_one(cur, args):
+    cur.execute("select rowid, config from TestResults ORDER BY pass+fail ASC LIMIT 1")
+    rowid, json_config = cur.fetchone()
+    config = parse_config(json_config)
+    print(config)
+
+    events = run_instance(config)
+
+    if check_ok(events):
+        cur.execute("UPDATE TestResults SET pass = pass + 1 WHERE rowid=?", (rowid,))
+        dump_events(f"logs/events{rowid:06}_pass.log", events)
+    else:
+        cur.execute("UPDATE TestResults SET fail = fail + 1 WHERE rowid=?", (rowid,))
+        dump_events(f"logs/events{rowid:06}_fail.log", events)
+
+def fuzz_deflake(args):
+    conn = create_db()
+    cur = conn.cursor()
+
+    while True:
+        print("=== FUZZ ===")
+        fuzz_one(cur, args)
+        print("=== DEFLAKE ===")
+        deflake_one(cur, args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -172,6 +196,11 @@ if __name__ == "__main__":
 
     parser_deflake = subparsers.add_parser("deflake")
     parser_deflake.set_defaults(func=deflake)
+
+    parser_fuzz_deflake = subparsers.add_parser("fuzz-deflake")
+    parser_fuzz_deflake.set_defaults(func=fuzz_deflake)
+    parser_fuzz_deflake.add_argument("--drops", type=int, default=1)
+    parser_fuzz_deflake.add_argument("--corruptions", type=int, default=0)
 
     args = parser.parse_args()
     args.func(args)

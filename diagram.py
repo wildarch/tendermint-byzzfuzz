@@ -26,6 +26,7 @@ if match is not None:
     num = int(match.group(1))
     print(ALL_DROPS[num])
 
+retransmitted_events = set()
 events = set()
 
 for event in args.logfile:
@@ -34,7 +35,7 @@ for event in args.logfile:
         if "drops" in e:
             print(e)
         if "msg" in e and e["msg"] == "Consensus message":
-            events.add(Event(
+            event = Event(
                 e["is_receive"], 
                 e["is_send"], 
                 e["sent_from"], 
@@ -42,7 +43,11 @@ for event in args.logfile:
                 e["type"], 
                 e["height"], 
                 e["round"],
-            ))
+            )
+            if event in events:
+                retransmitted_events.add(event)
+            else:
+                events.add(event)
     except json.JSONDecodeError:
         print("Cannot parse line: ", event)
 

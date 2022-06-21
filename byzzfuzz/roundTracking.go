@@ -102,6 +102,33 @@ func isMessageFromTotalRound(round int) testlib.Condition {
 	}
 }
 
+func isMessageOfTotalRound(round int) testlib.Condition {
+	return func(e *types.Event, c *testlib.Context) bool {
+		if liveness.IsTestFinished(e, c) {
+			return false
+		}
+		if !testlib.IsMessageSend()(e, c) {
+			panic("isMessageOfTotalRound uses the round as perceived by the sender, " +
+				"thus must be used together with isMessageSend")
+		}
+		message, ok := util.GetMessageFromEvent(e, c)
+		if !ok {
+			panic("Message not found!")
+		}
+		if message.Round() == -1 {
+			return false
+		}
+
+		totalRounds, ok := c.Vars.GetInt(
+			totalRoundForHeightRoundKey(e.Replica, message.Height(), message.Round()))
+		if !ok {
+			// This can happen if the node is byzantine and produces a message for an invalid round
+			return false
+		}
+		return totalRounds == round
+	}
+}
+
 func prevHeightKey(r types.ReplicaID) string {
 	return fmt.Sprintf("BF_prev_height_%s", r)
 }

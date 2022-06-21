@@ -18,7 +18,7 @@ func (c *MessageCorruption) Action() testlib.Action {
 	case ChangeVoteRound:
 		return changeVoteRound
 	case Omit:
-		return testlib.DropMessage()
+		return omitMessage
 	default:
 		panic("Invalid type of corruption")
 	}
@@ -66,8 +66,10 @@ func changeVoteToNil(e *types.Event, c *testlib.Context) []*types.Message {
 	c.Logger().With(log.LogParams{
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),
-		"from":   e.Replica,
-	}).Debug("ChangeVoteToNil corruption")
+		"from":   getPartLabel(c, e.Replica),
+		"to":     getPartLabel(c, tMsg.To),
+		"type":   "ChangeVoteToNil",
+	}).Info("Corruption")
 	return []*types.Message{c.NewMessage(message, msgB)}
 }
 
@@ -112,8 +114,10 @@ func changeVoteRound(e *types.Event, c *testlib.Context) []*types.Message {
 	c.Logger().With(log.LogParams{
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),
-		"from":   e.Replica,
-	}).Debug("ChangeVoteRound corruption")
+		"from":   getPartLabel(c, e.Replica),
+		"to":     getPartLabel(c, tMsg.To),
+		"type":   "ChangeVoteRound",
+	}).Info("Corruption")
 	return []*types.Message{c.NewMessage(m, msgB)}
 }
 
@@ -137,7 +141,25 @@ func changeProposalToNil(e *types.Event, c *testlib.Context) []*types.Message {
 	c.Logger().With(log.LogParams{
 		"height": tMsg.Height(),
 		"round":  tMsg.Round(),
-		"from":   e.Replica,
-	}).Debug("ChangeProposalToNil corruption")
+		"from":   getPartLabel(c, e.Replica),
+		"to":     getPartLabel(c, tMsg.To),
+		"type":   "ChangeProposalToNil",
+	}).Info("Corruption")
 	return []*types.Message{c.NewMessage(message, newMsgB)}
+}
+
+func omitMessage(e *types.Event, c *testlib.Context) []*types.Message {
+	message, _ := c.GetMessage(e)
+	tMsg, ok := util.GetParsedMessage(message)
+	if !ok {
+		return []*types.Message{}
+	}
+	c.Logger().With(log.LogParams{
+		"height": tMsg.Height(),
+		"round":  tMsg.Round(),
+		"from":   getPartLabel(c, e.Replica),
+		"to":     getPartLabel(c, tMsg.To),
+		"type":   "Omit",
+	}).Info("Corruption")
+	return []*types.Message{}
 }

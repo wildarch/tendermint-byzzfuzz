@@ -119,7 +119,7 @@ func ByzzFuzzInst(
 	for _, corruption := range corruptions {
 		filters.AddFilter(
 			testlib.If(testlib.IsMessageSend().
-				And(isMessageFromTotalRound(corruption.Round())).
+				And(isMessageOfTotalRound(corruption.Round())).
 				And(common.IsMessageType(corruption.MessageType())).
 				And(common.IsMessageFromPart(nodeLabel(corruption.From))).
 				And(IsMessageToOneOf(corruption.To)),

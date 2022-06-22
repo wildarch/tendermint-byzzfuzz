@@ -126,7 +126,16 @@ def fuzz(args):
         fuzz_one(cur, args)
 
 def fuzz_one(cur, args):
-    config = random_config(args.drops, args.corruptions)
+    drops = args.drops
+    if args.max_drops is not None:
+        drops = random.randint(0, args.max_drops)
+    corruptions = args.corruptions
+    if args.max_corruptions is not None:
+        # Do not allow 0 drops and 0 corruptions
+        min_corruptions = 1 if drops == 0 else 0
+        corruptions = random.randint(min_corruptions, args.max_corruptions)
+    print(f"drops: {drops}, corruptions: {corruptions}")
+    config = random_config(drops, corruptions)
     events = run_instance(config)
 
     passed = 0
@@ -193,6 +202,8 @@ if __name__ == "__main__":
     parser_fuzz.set_defaults(func=fuzz)
     parser_fuzz.add_argument("--drops", type=int, default=1)
     parser_fuzz.add_argument("--corruptions", type=int, default=0)
+    parser_fuzz.add_argument("--max-drops", type=int)
+    parser_fuzz.add_argument("--max-corruptions", type=int)
 
     parser_deflake = subparsers.add_parser("deflake")
     parser_deflake.set_defaults(func=deflake)
@@ -201,6 +212,8 @@ if __name__ == "__main__":
     parser_fuzz_deflake.set_defaults(func=fuzz_deflake)
     parser_fuzz_deflake.add_argument("--drops", type=int, default=1)
     parser_fuzz_deflake.add_argument("--corruptions", type=int, default=0)
+    parser_fuzz_deflake.add_argument("--max-drops", type=int)
+    parser_fuzz_deflake.add_argument("--max-corruptions", type=int)
 
     args = parser.parse_args()
     args.func(args)

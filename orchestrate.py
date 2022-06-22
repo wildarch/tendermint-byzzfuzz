@@ -72,11 +72,11 @@ def random_config(nrof_drops=1, nrof_corruptions=0):
     drops = sorted(random.sample(ALL_DROPS, nrof_drops))
 
     # Faulty node is fixed throughout execution
-    faulty = random.randint(0, 4)
+    faulty = random.randrange(0, 4)
 
     corruptions = []
     for _ in range(nrof_corruptions):
-        step = random.randint(0, MAX_STEPS)
+        step = random.randrange(0, MAX_STEPS)
         if step % 3 == 0:
             # Proposal
             all_corruption_types = ALL_PROPOSAL_CORRUPTION_TYPES

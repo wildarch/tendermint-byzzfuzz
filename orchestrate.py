@@ -23,15 +23,18 @@ def run_instance(config, liveness_timeout="1m"):
         line = line.decode("utf-8")
         sys.stdout.write(line)
 
-        event = json.loads(line)
-        events.append(event)
-        if "msg" in event and (event["msg"] == "Testcase succeeded" or event["msg"] == "Testcase failed"):
-            try:
-                proc.wait(30)
-            except subprocess.TimeoutExpired:
-                print("WARN: Timeout expired, terminating")
-                proc.terminate()
-            break
+        try:
+            event = json.loads(line)
+            events.append(event)
+            if "msg" in event and (event["msg"] == "Testcase succeeded" or event["msg"] == "Testcase failed"):
+                try:
+                    proc.wait(30)
+                except subprocess.TimeoutExpired:
+                    print("WARN: Timeout expired, terminating")
+                    proc.terminate()
+                break
+        except json.decoder.JSONDecodeError:
+            print(f"WARN: cannot decode line '{line}'")
     return events
 
 def drop1_all():

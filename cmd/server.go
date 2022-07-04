@@ -52,6 +52,10 @@ var verifyCmd = flag.NewFlagSet("verify", flag.ExitOnError)
 var runInstanceCmd = flag.NewFlagSet("run-instance", flag.ExitOnError)
 var livenessTimeout = runInstanceCmd.Duration("liveness-timeout", 1*time.Minute, "Time to wait for a new commit after the network heals, to verify liveness")
 
+var baselineCmd = flag.NewFlagSet("baseline", flag.ExitOnError)
+var dropPercent = baselineCmd.Int("drop-percent", 25, "Percentage of messages to drop (e.g. 25 for 25%)")
+var corruptPercent = baselineCmd.Int("corrupt-percent", 25, "Percentage of messages to corrupt (e.g. 25 for 25%)")
+
 var sysParams = common.NewSystemParams(4)
 
 func main() {
@@ -76,6 +80,8 @@ func main() {
 		verify(os.Args[commandIndex+1:])
 	case "run-instance":
 		runInstance(os.Args[commandIndex+1:])
+	case "baseline":
+		baseline(os.Args[commandIndex+1:])
 	default:
 		fmt.Println("expected 'unittest' or 'fuzz' subcommands")
 		os.Exit(1)
@@ -111,6 +117,14 @@ func runInstance(args []string) {
 	for len(specCh) > 0 {
 		<-specCh
 	}
+}
+
+func baseline(args []string) {
+	baselineCmd.Parse(args)
+
+	testcase := byzzfuzz.BaselineTestCase(sysParams, *dropPercent, *corruptPercent)
+
+	runSingleTestCase(sysParams, testcase)
 }
 
 func unittest(args []string) {

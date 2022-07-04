@@ -12,18 +12,5 @@ curl -LO https://github.com/zeu5/tendermint/archive/refs/heads/$ZIPFILE
 unzip $ZIPFILE
 rm -f $ZIPFILE
 
-# tendermint-testing
-ZIPFILE=tendermint-testing.zip
-rm -rf tendermint-testing/ $ZIPFILE 
-curl -Lo $ZIPFILE https://github.com/netrixframework/tendermint-testing/archive/ef12041869655577851f603aee1eb8a9b756f089.zip
-unzip $ZIPFILE
-rm -f $ZIPFILE
-mv tendermint-testing-* tendermint-testing/
-
-# tendermint-test
-ZIPFILE=tendermint-test.zip
-rm -rf tendermint-test/ $ZIPFILE 
-curl -Lo $ZIPFILE https://github.com/ImperiumProject/tendermint-test/archive/89de7d0d2208568d5e70d42b4d85986c669b4df4.zip
-unzip $ZIPFILE
-rm -f $ZIPFILE
-mv tendermint-test-* tendermint-test/
+sed -i 's/10.0.0.8/192.167.0.1/g' tendermint-pct-instrumentation/networks/local/localnode/config-template.toml
+sed -i 's/^create-empty-blocks = false/create-empty-blocks = true\ntimeout-commit = "10s"/g' tendermint-pct-instrumentation/networks/local/localnode/config-template.toml

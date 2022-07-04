@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 
-rsync -rt munich:tendermint-byzzfuzz/logs/ logs/
+rsync -zrt munich:tendermint-byzzfuzz/logs/ logs/

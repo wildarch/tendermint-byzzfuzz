@@ -17,6 +17,23 @@ class Event:
     height: int
     round: int
 
+    def __lt__(a,b):
+        if a.height < b.height:
+            return True
+        if a.height > b.height:
+            return False
+        
+        if a.round < b.round:
+            return True
+        if a.round > b.round:
+            return False
+        
+        if a.msg_type == "Proposal":
+            return b.msg_type in ["Prevote", "Precommit"]
+        if a.msg_type == "Prevote":
+            return b.msg_type == "Precommit"
+        return False
+
 parser = argparse.ArgumentParser()
 parser.add_argument('logfile', type=argparse.FileType('r'))
 args = parser.parse_args()
@@ -115,7 +132,8 @@ for (height, round) in rounds:
                 continue
             fill = 'black'
             if event in retransmitted_events:
-                fill = 'blue'
+                #fill = 'blue'
+                pass
             if event in corrupted_events:
                 fill = 'red'
             if is_received(event):

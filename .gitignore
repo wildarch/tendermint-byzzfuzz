@@ -6,3 +6,6 @@ diagram.pdf
 diagram.ps
 
 __pycache__/
+
+logs/
+*.zip

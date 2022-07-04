@@ -10,6 +10,7 @@ import os
 import random
 import sqlite3
 import argparse
+import time
 
 def run_instance(config, liveness_timeout="1m"):
     proc = subprocess.Popen(["go", "run", "./cmd/server.go", "run-instance", f"--liveness-timeout={liveness_timeout}"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -171,8 +172,13 @@ def deflake(args):
         deflake_one(cur, args)
 
 def deflake_one(cur, args):
-    cur.execute("select rowid, config from TestResults ORDER BY pass+fail ASC LIMIT 1")
-    rowid, json_config = cur.fetchone()
+    cur.execute("select rowid, config from TestResults WHERE pass = 0 AND fail < 5 ORDER BY RANDOM() LIMIT 1")
+    res = cur.fetchone()
+    if res is None:
+        print("WARN: Nothing to deflake")
+        time.sleep(5)
+        return
+    rowid, json_config = res 
     config = parse_config(json_config)
     print(config)
 

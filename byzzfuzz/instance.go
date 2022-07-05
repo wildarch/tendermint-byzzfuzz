@@ -176,7 +176,7 @@ func dropMessageLoudly(e *types.Event, c *testlib.Context) (message []*types.Mes
 			"type":   m.Type,
 			"height": m.Height(),
 			"round":  m.Round(),
-		}).Debug("Dropping message")
+		}).Info("Dropping message")
 	} else {
 		c.Logger().Warn("Dropping message with unknown height/round")
 	}

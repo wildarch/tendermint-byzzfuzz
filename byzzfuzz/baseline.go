@@ -32,40 +32,24 @@ func BaselineTestCase(
 
 	filters.AddFilter(testlib.If(
 		testlib.IsMessageSend().And(
-			randomlyPick(dropPercent))).Then(dropMessageLoudly))
+			randomlyPick(dropPercent)).And(IsConsensusMessage())).Then(dropMessageLoudly))
 	filters.AddFilter(testlib.If(
 		testlib.IsMessageSend().And(
 			common.IsMessageFromPart("node0").And(
-				randomlyPick(corruptPercent)))).Then(garbleMessage()))
-
-	/*
-		for _, drop := range drops {
-			filters.AddFilter(
-				testlib.If(
-					testlib.IsMessageSend().
-						And(isMessageFromTotalRound(drop.Round())).
-						And(common.IsMessageType(drop.MessageType())).
-						And(FromToIsolated(drop.Partition)),
-				).Then(dropMessageLoudly),
-			)
-		}
-
-		for _, corruption := range corruptions {
-			filters.AddFilter(
-				testlib.If(testlib.IsMessageSend().
-					And(isMessageOfTotalRound(corruption.Round())).
-					And(common.IsMessageType(corruption.MessageType())).
-					And(common.IsMessageFromPart(nodeLabel(corruption.From))).
-					And(IsMessageToOneOf(corruption.To)),
-				).Then(corruption.Action()),
-			)
-		}
-	*/
+				randomlyPick(corruptPercent))).And(IsConsensusMessage())).Then(garbleMessage()))
 
 	testcase := testlib.NewTestCase("Baseline", 2*time.Minute, sm, filters)
 	testcase.SetupFunc(common.Setup(sp, labelNodes, liveness.SetupLivenessTimer(time.Minute)))
 
 	return testcase
+}
+
+func IsConsensusMessage() testlib.Condition {
+	return func(e *types.Event, c *testlib.Context) bool {
+		return common.IsMessageType(util.Proposal)(e, c) ||
+			common.IsMessageType(util.Prevote)(e, c) ||
+			common.IsMessageType(util.Precommit)(e, c)
+	}
 }
 
 func randomlyPick(pct int) testlib.Condition {

@@ -38,7 +38,7 @@ if __name__ == "__main__":
     passed = 0
     failed = 0
     total = 0
-    for i in range(100):
+    for i in range(200):
         logpath = f"baseline_logs/events{i:03}.log"
         if os.path.isfile(logpath):
             print("Skip already processed: ", i)

@@ -235,7 +235,7 @@ func logBlockIds(e *types.Event, c *testlib.Context) (messages []*types.Message,
 	}
 
 	blockId, ok := util.GetProposalBlockID(message)
-	if !ok {
+	if !ok || blockId == nil {
 		return
 	}
 
@@ -249,7 +249,7 @@ func logBlockIds(e *types.Event, c *testlib.Context) (messages []*types.Message,
 	c.Vars.Set("BF_blockids", blockIds)
 
 	c.Logger().With(log.LogParams{
-		"block_id": nil,
+		"block_id": blockId,
 	}).Info("blockID")
 
 	return

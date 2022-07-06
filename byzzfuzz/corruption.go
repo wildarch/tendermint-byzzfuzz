@@ -7,6 +7,7 @@ import (
 	"github.com/netrixframework/netrix/testlib"
 	"github.com/netrixframework/netrix/types"
 	"github.com/netrixframework/tendermint-testing/util"
+	ttypes "github.com/tendermint/tendermint/types"
 )
 
 func (c *MessageCorruption) Action() testlib.Action {
@@ -16,9 +17,11 @@ func (c *MessageCorruption) Action() testlib.Action {
 	case ChangeVoteToNil:
 		return changeVoteToNil
 	case ChangeVoteRound:
-		return changeVoteRound
+		return changeVoteRound(c.Seed)
 	case Omit:
 		return omitMessage
+	case ChangeBlockId:
+		return changeBlockId(c.Seed)
 	default:
 		panic("Invalid type of corruption")
 	}
@@ -73,52 +76,54 @@ func changeVoteToNil(e *types.Event, c *testlib.Context) []*types.Message {
 	return []*types.Message{c.NewMessage(message, msgB)}
 }
 
-func changeVoteRound(e *types.Event, c *testlib.Context) []*types.Message {
-	m, ok := c.GetMessage(e)
-	if !ok {
-		return []*types.Message{}
-	}
-	tMsg, ok := util.GetParsedMessage(m)
-	if !ok {
-		return []*types.Message{m}
-	}
-	if tMsg.Type != util.Precommit && tMsg.Type != util.Prevote {
-		return []*types.Message{m}
-	}
-	valAddr, ok := util.GetVoteValidator(tMsg)
-	if !ok {
-		return []*types.Message{m}
-	}
-	var replica *types.Replica = nil
-	for _, r := range c.Replicas.Iter() {
-		addr, err := util.GetReplicaAddress(r)
+func changeVoteRound(seed int) testlib.Action {
+	return func(e *types.Event, c *testlib.Context) []*types.Message {
+		m, ok := c.GetMessage(e)
+		if !ok {
+			return []*types.Message{}
+		}
+		tMsg, ok := util.GetParsedMessage(m)
+		if !ok {
+			return []*types.Message{m}
+		}
+		if tMsg.Type != util.Precommit && tMsg.Type != util.Prevote {
+			return []*types.Message{m}
+		}
+		valAddr, ok := util.GetVoteValidator(tMsg)
+		if !ok {
+			return []*types.Message{m}
+		}
+		var replica *types.Replica = nil
+		for _, r := range c.Replicas.Iter() {
+			addr, err := util.GetReplicaAddress(r)
+			if err != nil {
+				continue
+			}
+			if bytes.Equal(addr, valAddr) {
+				replica = r
+				break
+			}
+		}
+		if replica == nil {
+			return []*types.Message{m}
+		}
+		newVote, err := util.ChangeVoteRound(replica, tMsg, int32(seed))
 		if err != nil {
-			continue
+			return []*types.Message{m}
 		}
-		if bytes.Equal(addr, valAddr) {
-			replica = r
-			break
+		msgB, err := newVote.Marshal()
+		if err != nil {
+			return []*types.Message{m}
 		}
+		c.Logger().With(log.LogParams{
+			"height": tMsg.Height(),
+			"round":  tMsg.Round(),
+			"from":   getPartLabel(c, e.Replica),
+			"to":     getPartLabel(c, tMsg.To),
+			"type":   "ChangeVoteRound",
+		}).Info("Corruption")
+		return []*types.Message{c.NewMessage(m, msgB)}
 	}
-	if replica == nil {
-		return []*types.Message{m}
-	}
-	newVote, err := util.ChangeVoteRound(replica, tMsg, int32(tMsg.Round()+2))
-	if err != nil {
-		return []*types.Message{m}
-	}
-	msgB, err := newVote.Marshal()
-	if err != nil {
-		return []*types.Message{m}
-	}
-	c.Logger().With(log.LogParams{
-		"height": tMsg.Height(),
-		"round":  tMsg.Round(),
-		"from":   getPartLabel(c, e.Replica),
-		"to":     getPartLabel(c, tMsg.To),
-		"type":   "ChangeVoteRound",
-	}).Info("Corruption")
-	return []*types.Message{c.NewMessage(m, msgB)}
 }
 
 func changeProposalToNil(e *types.Event, c *testlib.Context) []*types.Message {
@@ -162,4 +167,90 @@ func omitMessage(e *types.Event, c *testlib.Context) []*types.Message {
 		"type":   "Omit",
 	}).Info("Corruption")
 	return []*types.Message{}
+}
+
+func changeBlockId(seed int) testlib.Action {
+	return func(e *types.Event, c *testlib.Context) []*types.Message {
+		c.Logger().Info("Attempt to change block id")
+		blockIdsR, ok := c.Vars.Get("BF_blockids")
+		if !ok {
+			blockIdsR = make([]*ttypes.BlockID, 0)
+		}
+		blockIds := blockIdsR.([]*ttypes.BlockID)
+		newBlockId := blockIds[seed%len(blockIds)]
+
+		m, ok := c.GetMessage(e)
+		if !ok {
+			return []*types.Message{}
+		}
+		tMsg, ok := util.GetParsedMessage(m)
+		if !ok {
+			return []*types.Message{m}
+		}
+		if tMsg.Type != util.Precommit && tMsg.Type != util.Prevote {
+			return []*types.Message{m}
+		}
+		valAddr, ok := util.GetVoteValidator(tMsg)
+		if !ok {
+			return []*types.Message{m}
+		}
+		var replica *types.Replica = nil
+		for _, r := range c.Replicas.Iter() {
+			addr, err := util.GetReplicaAddress(r)
+			if err != nil {
+				continue
+			}
+			if bytes.Equal(addr, valAddr) {
+				replica = r
+				break
+			}
+		}
+		if replica == nil {
+			return []*types.Message{m}
+		}
+		newVote, err := util.ChangeVote(replica, tMsg, newBlockId)
+		if err != nil {
+			return []*types.Message{m}
+		}
+		msgB, err := newVote.Marshal()
+		if err != nil {
+			return []*types.Message{m}
+		}
+		c.Logger().With(log.LogParams{
+			"height":   tMsg.Height(),
+			"round":    tMsg.Round(),
+			"from":     getPartLabel(c, e.Replica),
+			"to":       getPartLabel(c, tMsg.To),
+			"type":     "ChangeBlockId",
+			"block_id": newBlockId,
+		}).Info("Corruption")
+		return []*types.Message{c.NewMessage(m, msgB)}
+	}
+}
+
+func logBlockIds(e *types.Event, c *testlib.Context) (messages []*types.Message, handled bool) {
+	message, ok := util.GetMessageFromEvent(e, c)
+	if !ok {
+		return
+	}
+
+	blockId, ok := util.GetProposalBlockID(message)
+	if !ok {
+		return
+	}
+
+	// Append the block id
+	blockIdsR, ok := c.Vars.Get("BF_blockids")
+	if !ok {
+		blockIdsR = make([]*ttypes.BlockID, 0)
+	}
+	blockIds := blockIdsR.([]*ttypes.BlockID)
+	blockIds = append(blockIds, blockId)
+	c.Vars.Set("BF_blockids", blockIds)
+
+	c.Logger().With(log.LogParams{
+		"block_id": nil,
+	}).Info("blockID")
+
+	return
 }

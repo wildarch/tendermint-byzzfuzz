@@ -12,6 +12,7 @@ class CorruptionType(IntEnum):
 	CHANGE_VOTE_TO_NIL = 1
 	CHANGE_VOTE_ROUND = 2
 	OMIT = 3
+	CHANGE_BLOCK_ID = 4
 
 @dataclass(eq=True, order=True)
 class MessageCorruption:
@@ -19,6 +20,7 @@ class MessageCorruption:
     from_node: int
     to_nodes: list[int]
     corruption_type: CorruptionType
+    seed: int
 
 @dataclass(eq=True)
 class ByzzFuzzInstanceConfig:
@@ -55,13 +57,12 @@ MAX_STEPS = 10
 ALL_DROPS = [MessageDrop(step, part) for step, part in itertools.product(range(MAX_STEPS), ALL_PARTITIONS)]
 
 ALL_PROPOSAL_CORRUPTION_TYPES = [
-	CorruptionType.CHANGE_PROPOSAL_TO_NIL,
+	CorruptionType.CHANGE_BLOCK_ID,
 	CorruptionType.OMIT,
 ]
 
 ALL_VOTE_CORRUPTION_TYPES = [
-	CorruptionType.CHANGE_VOTE_TO_NIL,
-	CorruptionType.CHANGE_VOTE_ROUND,
+	CorruptionType.CHANGE_BLOCK_ID,
 	CorruptionType.OMIT,
 ]
 

@@ -6,6 +6,8 @@ SELECT
     SUM(CASE WHEN fail > 0 THEN 1 ELSE 0 END) AS fail,
     SUM(CASE WHEN fail > 1 THEN 1 ELSE 0 END) AS fail2,
     SUM(CASE WHEN fail >= 5 AND pass = 0 THEN 1 ELSE 0 END) AS fail_reliable,
+    SUM(CASE WHEN fail >= 3 AND pass = 0 THEN 1 ELSE 0 END) AS fail_reliable3,
+    SUM(CASE WHEN fail > 0 AND pass = 0 THEN 1 ELSE 0 END) AS fail_always,
     SUM(CASE WHEN pass > 0 THEN 1 ELSE 0 END) AS pass,
     SUM(CASE WHEN fail > 0 AND pass > 0 THEN 1 ELSE 0 END) AS flaky
 

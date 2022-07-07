@@ -22,6 +22,9 @@ def run_instance(config, liveness_timeout="1m"):
     events = []
     for line in iter(proc.stderr.readline,''):
         line = line.decode("utf-8")
+        if line == "":
+            print("ERROR: empty line")
+            sys.exit(1)
         sys.stdout.write(line)
 
         try:

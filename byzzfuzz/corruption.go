@@ -172,17 +172,17 @@ func omitMessage(e *types.Event, c *testlib.Context) []*types.Message {
 func changeBlockId(seed int) testlib.Action {
 	return func(e *types.Event, c *testlib.Context) []*types.Message {
 		c.Logger().Info("Attempt to change block id")
-		blockIdsR, ok := c.Vars.Get("BF_blockids")
-		if !ok {
-			blockIdsR = make([]*ttypes.BlockID, 0)
-		}
-		blockIds := blockIdsR.([]*ttypes.BlockID)
-		newBlockId := blockIds[seed%len(blockIds)]
-
 		m, ok := c.GetMessage(e)
 		if !ok {
 			return []*types.Message{}
 		}
+		blockIdsR, ok := c.Vars.Get("BF_blockids")
+		if !ok {
+			return []*types.Message{m}
+		}
+		blockIds := blockIdsR.([]*ttypes.BlockID)
+		newBlockId := blockIds[seed%len(blockIds)]
+
 		tMsg, ok := util.GetParsedMessage(m)
 		if !ok {
 			return []*types.Message{m}

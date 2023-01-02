@@ -41,6 +41,7 @@ type MessageCorruption struct {
 	From       int            `json:"from_node"`
 	To         []int          `json:"to_nodes"`
 	Corruption CorruptionType `json:"corruption_type"`
+	Seed       int            `json:"seed"`
 }
 
 func (c *MessageCorruption) MessageType() util.MessageType {
@@ -67,6 +68,8 @@ const (
 	ChangeVoteToNil
 	ChangeVoteRound
 	Omit
+	ChangeVoteRoundAnyScope
+	ChangeBlockIdAnyScope
 )
 
 var ProposalCorruptionTypes = []CorruptionType{
@@ -104,6 +107,7 @@ func ByzzFuzzInst(
 	filters.AddFilter(spec.Log(specEventCh))
 
 	filters.AddFilter(logConsensusMessages)
+	filters.AddFilter(logBlockIds)
 
 	for _, drop := range drops {
 		filters.AddFilter(

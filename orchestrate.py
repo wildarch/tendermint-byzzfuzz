@@ -11,6 +11,7 @@ import random
 import sqlite3
 import argparse
 import time
+from pathlib import Path
 
 def run_instance(config, liveness_timeout="1m"):
     proc = subprocess.Popen(["go", "run", "./cmd/server.go", "run-instance", f"--liveness-timeout={liveness_timeout}"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -38,41 +39,7 @@ def run_instance(config, liveness_timeout="1m"):
             print(f"WARN: cannot decode line '{line}'")
     return events
 
-def drop1_all():
-    # 1m
-    for i, drop in enumerate(ALL_DROPS):
-        logpath = f"drop1/events{i:03}.log"
-        if os.path.isfile(logpath):
-            print("Skip already processed: ", drop)
-            continue
-
-        inst = ByzzFuzzInstanceConfig([drop], []) 
-        print(f"Run instance: {inst}")
-        events = run_instance(inst)
-
-        with open(logpath, 'w') as logfile:
-            for e in events:
-                json.dump(e, logfile)
-                logfile.write('\n')
-
-def drop1_5m_all():
-    # HACK 5M
-    for i, drop in enumerate(ALL_DROPS):
-        logpath = f"drop1_5m/events{i:03}.log"
-        if os.path.isfile(logpath):
-            print("Skip already processed: ", drop)
-            continue
-
-        inst = ByzzFuzzInstanceConfig([drop], []) 
-        print(f"Run instance: {inst}")
-        events = run_instance(inst, liveness_timeout="5m")
-
-        with open(logpath, 'w') as logfile:
-            for e in events:
-                json.dump(e, logfile)
-                logfile.write('\n')
-
-def random_config(nrof_drops=1, nrof_corruptions=0):
+def random_config(scope, nrof_drops=1, nrof_corruptions=0):
     drops = sorted(random.sample(ALL_DROPS, nrof_drops))
 
     # Faulty node is fixed throughout execution
@@ -83,16 +50,27 @@ def random_config(nrof_drops=1, nrof_corruptions=0):
         step = random.randrange(0, MAX_STEPS)
         if step % 3 == 0:
             # Proposal
-            all_corruption_types = ALL_PROPOSAL_CORRUPTION_TYPES
+            if scope == "small":
+                all_corruption_types = ALL_PROPOSAL_CORRUPTION_TYPES
+            elif scope == "any":
+                all_corruption_types = ALL_PROPOSAL_CORRUPTION_TYPES_ANY_SCOPE
         else:
             # Vote (prevote, precommit)
-            all_corruption_types = ALL_VOTE_CORRUPTION_TYPES
+            if scope == "small":
+                all_corruption_types = ALL_VOTE_CORRUPTION_TYPES
+            elif scope == "any":
+                all_corruption_types = ALL_VOTE_CORRUPTION_TYPES_ANY_SCOPE
         corruption = random.choice(all_corruption_types)
         corruption = MessageCorruption(
             step = step,
             from_node = faulty,  
             to_nodes = random.choice(ALL_SUBSETS),
             corruption_type = corruption, 
+            # The seed value is, among other things, used to select a previously seen message ID.
+            # It should be large enough that any message in the history is reachable.
+            # We cautiously pick a high value, an upper bound to the number of messages we expect 
+            # the cluster to exchange in our short test period.
+            seed = random.randint(0, 10_000),
         )
         corruptions.append(corruption)
 
@@ -104,8 +82,13 @@ def dump_events(path, events):
             json.dump(e, logfile)
             logfile.write('\n')
 
-def create_db():
-    conn = sqlite3.connect("logs/test_results.sqlite3", isolation_level=None)
+def logs_dir(args):
+    return Path(f"logs_{args.scope}_scope")
+
+def create_db(args):
+    dir = logs_dir(args)
+    dir.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(dir / "test_results.sqlite3", isolation_level=None)
     conn.execute('''
 		CREATE TABLE IF NOT EXISTS TestResults(
 			config JSON,
@@ -123,7 +106,7 @@ def check_ok(events):
     return success
 
 def fuzz(args):
-    conn = create_db()
+    conn = create_db(args)
     cur = conn.cursor()
 
     while True:
@@ -139,7 +122,7 @@ def fuzz_one(cur, args):
         min_corruptions = 1 if drops == 0 else 0
         corruptions = random.randint(min_corruptions, args.max_corruptions)
     print(f"drops: {drops}, corruptions: {corruptions}")
-    config = random_config(drops, corruptions)
+    config = random_config(args.scope, drops, corruptions)
     events = run_instance(config)
 
     passed = 0
@@ -155,7 +138,7 @@ def fuzz_one(cur, args):
     ''', (json_config, passed, failed))
     rowid = cur.lastrowid
 
-    dump_events(f"logs/events{rowid:06}.log", events)
+    dump_events(logs_dir(args) / f"events{rowid:06}.log", events)
 
 def parse_config(json_config):
     c = json.loads(json_config)
@@ -165,7 +148,7 @@ def parse_config(json_config):
     )
 
 def deflake(args):
-    conn = create_db()
+    conn = create_db(args)
     cur = conn.cursor()
 
     while True:
@@ -186,13 +169,13 @@ def deflake_one(cur, args):
 
     if check_ok(events):
         cur.execute("UPDATE TestResults SET pass = pass + 1 WHERE rowid=?", (rowid,))
-        dump_events(f"logs/events{rowid:06}_pass.log", events)
+        dump_events(logs_dir(args) / f"events{rowid:06}_pass.log", events)
     else:
         cur.execute("UPDATE TestResults SET fail = fail + 1 WHERE rowid=?", (rowid,))
-        dump_events(f"logs/events{rowid:06}_fail.log", events)
+        dump_events(logs_dir(args) / f"events{rowid:06}_fail.log", events)
 
 def fuzz_deflake(args):
-    conn = create_db()
+    conn = create_db(args)
     cur = conn.cursor()
 
     while True:
@@ -203,6 +186,7 @@ def fuzz_deflake(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--scope", choices=["any", "small"], required=True)
     subparsers = parser.add_subparsers()
     subparsers.required = True
     subparsers.dest = "commmand"

@@ -19,6 +19,10 @@ make build-linux
 make build-docker-localnode
 ```
 
+## Types of violations
+Our Tendermint test setup has only found *termination violations*, and thus the next few sections describe only how to find those.
+After we have covered how to run the different configurations, we discuss how to check that there were indeed no *validity*, *integrity* or *agreement* violations in any of the runs.
+
 ## Running baseline
 Run the baseline orchestration script to begin fuzzing with the baseline implementation:
 
@@ -28,48 +32,31 @@ Run the baseline orchestration script to begin fuzzing with the baseline impleme
 
 This will execute 200 runs that randomly drop or corrupt (bit-wise) messages.
 Logs of consensus messages exchanged are saved into `baseline_logs/`, and after each test run, we print the number of passed and failed tests.
-In this configuration (nearly) all tests should be successful.
+A test fails when the cluster does not commit a new transaction within 1 minute after ceasing all drops and corruptions ('healing' the network), indicating a *termination violation*.
 
 ## Running small-scope
-
-
-
-
-
-
-## Running
-First start server:
-```
-cd third_party/tendermint-testing
-go run ./server.go
+```shell
+./orchestrate.py --scope small fuzz-deflake --max-drops 2 --max-corruptions 2
 ```
 
-If you see errors about failing to bind to the address, it is possible the bridge address has not yet been created.
-In this case you can start the nodes first one time (see below) and stop them with Ctrl-C once they have started. This should create the bridge.
-
-**The server must start before the nodes, or the nodes will not connect to the server.**
-
-Now start nodes:
-```
-cd third_party/tendermint-pct-instrumentation
-make localnet-start
+## Running any-scope
+```shell
+./orchestrate.py --scope any fuzz-deflake --max-drops 2 --max-corruptions 2
 ```
 
-In the testing server logs you should start to see JSON messages. Look for `Starting testcase`, and eventually you should see `Testcase succeeded`.
+## Validity
+A correct process may only decide a value that was proposed by a correct process.
 
-If you see permission errors when starting the network for the second time change this in `third_party/tendermint-pct-instrumentation/Makefile`:
+## Agreement
+Our test harness implements agreement checking by keeping track of the block IDs that nodes commit. 
+If a node commits a block id that does not correspond to what another node has already committed for that height, the test transitions to the special 'diff-commits' label, which will appear in the logs.
+To check that this state was not reached in any of the logged runs, run:
 
-```diff
-    # Stop testnet
-    localnet-stop:
-    docker-compose down
--   rm -rf $(BUILDDIR)/node*
-+   docker run --rm -v $(BUILDDIR):/tendermint alpine rm -rf /tendermint/node{0,1,2,3}
-    .PHONY: localnet-stop
+```shell
+grep -r diff-commits baseline_logs/ logs_any_scope/ logs_small_scope/ 
 ```
 
+This should return no results.
 
-# To add to docs
-https://docs.docker.com/network/bridge/#enable-forwarding-from-docker-containers-to-the-outside-world
-
-docker-compose up --no-start
+## Integrity
+The agreement test also covers integrity: if a node first commits one block, then commits another different block, the orchestration server detects that two different block IDs have been committed, and assigns the same 'diff-commits' label.

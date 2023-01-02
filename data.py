@@ -12,6 +12,8 @@ class CorruptionType(IntEnum):
 	CHANGE_VOTE_TO_NIL = 1
 	CHANGE_VOTE_ROUND = 2
 	OMIT = 3
+	CHANGE_VOTE_ROUND_ANY_SCOPE = 4
+	CHANGE_BLOCK_ID_ANY_SCOPE = 5
 
 @dataclass(eq=True, order=True)
 class MessageCorruption:
@@ -19,6 +21,7 @@ class MessageCorruption:
     from_node: int
     to_nodes: list[int]
     corruption_type: CorruptionType
+    seed: int
 
 @dataclass(eq=True)
 class ByzzFuzzInstanceConfig:
@@ -59,9 +62,19 @@ ALL_PROPOSAL_CORRUPTION_TYPES = [
 	CorruptionType.OMIT,
 ]
 
+ALL_PROPOSAL_CORRUPTION_TYPES_ANY_SCOPE = [
+	CorruptionType.CHANGE_BLOCK_ID_ANY_SCOPE,
+	CorruptionType.OMIT,
+]
+
 ALL_VOTE_CORRUPTION_TYPES = [
 	CorruptionType.CHANGE_VOTE_TO_NIL,
 	CorruptionType.CHANGE_VOTE_ROUND,
+	CorruptionType.OMIT,
+]
+
+ALL_VOTE_CORRUPTION_TYPES_ANY_SCOPE = [
+	CorruptionType.CHANGE_VOTE_ROUND_ANY_SCOPE,
 	CorruptionType.OMIT,
 ]
 

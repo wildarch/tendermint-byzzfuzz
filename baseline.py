@@ -3,6 +3,7 @@ import subprocess
 import sys
 import json
 import os
+from pathlib import Path
 
 def run_baseline():
     proc = subprocess.Popen(["go", "run", "./cmd/server.go", "baseline"], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -38,6 +39,7 @@ if __name__ == "__main__":
     passed = 0
     failed = 0
     total = 0
+    Path("baseline_logs/").mkdir(parents=True, exist_ok=True)
     for i in range(200):
         logpath = f"baseline_logs/events{i:03}.log"
         if os.path.isfile(logpath):

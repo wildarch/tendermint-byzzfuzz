@@ -227,9 +227,29 @@ def reproduce(args):
 
     print("Done!")
 
+def quick_tests(args):
+    pass_config = ByzzFuzzInstanceConfig([], [])
+    # Fully isolate all nodes
+    fail_config = ByzzFuzzInstanceConfig([
+        MessageDrop(
+            step = 1,
+            partition = [[0], [1], [2], [3]],
+        )
+    ], [])
+
+    # Alternate between pass and fail tests.
+    # Repeat the cycle once because the very first run starts from a clean env.
+    for i in range(2):
+        print("expect PASS")
+        events = run_instance(pass_config)
+        assert(check_ok(events))
+
+        print("expect FAIL")
+        events = run_instance(fail_config)
+        assert(not check_ok(events))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scope", choices=["any", "small"], required=True)
     subparsers = parser.add_subparsers()
     subparsers.required = True
     subparsers.dest = "commmand"
@@ -240,9 +260,11 @@ if __name__ == "__main__":
     parser_fuzz.add_argument("--corruptions", type=int, default=0)
     parser_fuzz.add_argument("--max-drops", type=int)
     parser_fuzz.add_argument("--max-corruptions", type=int)
+    parser_fuzz.add_argument("--scope", choices=["any", "small"], required=True)
 
     parser_deflake = subparsers.add_parser("deflake")
     parser_deflake.set_defaults(func=deflake)
+    parser_deflake.add_argument("--scope", choices=["any", "small"], required=True)
 
     parser_fuzz_deflake = subparsers.add_parser("fuzz-deflake")
     parser_fuzz_deflake.set_defaults(func=fuzz_deflake)
@@ -250,9 +272,14 @@ if __name__ == "__main__":
     parser_fuzz_deflake.add_argument("--corruptions", type=int, default=0)
     parser_fuzz_deflake.add_argument("--max-drops", type=int)
     parser_fuzz_deflake.add_argument("--max-corruptions", type=int)
+    parser_fuzz_deflake.add_argument("--scope", choices=["any", "small"], required=True)
 
     parser_reproduce = subparsers.add_parser("reproduce")
     parser_reproduce.set_defaults(func=reproduce)
+    parser_reproduce.add_argument("--scope", choices=["any", "small"], required=True)
+
+    parser_quick_tests = subparsers.add_parser("quick_tests")
+    parser_quick_tests.set_defaults(func=quick_tests)
 
     args = parser.parse_args()
     args.func(args)

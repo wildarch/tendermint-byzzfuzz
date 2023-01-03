@@ -1,2 +1,0 @@
-- Tracking height/round of peers (untested)
-- Spec checker for move to higher round (appears broken)

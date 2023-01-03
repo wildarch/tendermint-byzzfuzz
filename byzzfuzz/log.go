@@ -8,16 +8,6 @@ import (
 )
 
 func logConsensusMessages(e *types.Event, c *testlib.Context) (messages []*types.Message, handled bool) {
-	/*
-		message, ok := c.GetMessage(e)
-		if !ok {
-			return
-		}
-		tMessage, ok := util.GetParsedMessage(message)
-		if !ok {
-			return
-		}
-	*/
 	message, ok := util.GetMessageFromEvent(e, c)
 	if !ok {
 		return

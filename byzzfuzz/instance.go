@@ -92,7 +92,7 @@ func ByzzFuzzInst(
 	drops []MessageDrop,
 	corruptions []MessageCorruption,
 	timeout time.Duration,
-	livenessTimeout time.Duration) (*testlib.TestCase, chan spec.Event) {
+	livenessTimeout time.Duration) *testlib.TestCase {
 
 	sm := testlib.NewStateMachine()
 	init := sm.Builder()
@@ -103,8 +103,6 @@ func ByzzFuzzInst(
 	filters := testlib.NewFilterSet()
 	filters.AddFilter(testlib.If(sm.InState(testlib.SuccessStateLabel)).Then(endTest))
 	filters.AddFilter(trackTotalRounds)
-	specEventCh := make(chan spec.Event, 10000)
-	filters.AddFilter(spec.Log(specEventCh))
 
 	filters.AddFilter(logConsensusMessages)
 	filters.AddFilter(logBlockIds)
@@ -134,7 +132,7 @@ func ByzzFuzzInst(
 	testcase := testlib.NewTestCase("ByzzFuzzInst", timeout+livenessTimeout, sm, filters)
 	testcase.SetupFunc(common.Setup(sp, labelNodes, liveness.SetupLivenessTimer(timeout)))
 
-	return testcase, specEventCh
+	return testcase
 }
 
 func endTest(e *types.Event, c *testlib.Context) []*types.Message {

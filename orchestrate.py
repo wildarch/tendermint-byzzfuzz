@@ -184,6 +184,49 @@ def fuzz_deflake(args):
         print("=== DEFLAKE ===")
         deflake_one(cur, args)
 
+def reproduce(args):
+    conn = create_db(args)
+    cur = conn.cursor()
+
+    max_drops = 2
+    max_corruptions = 2
+    nrof_configs = 200
+
+
+    def insert_config(config):
+        json_config = json.dumps(dataclasses.asdict(config))
+        passed = 0
+        failed = 0
+        cur.execute('''
+            INSERT INTO TestResults VALUES (?, ?, ?)
+        ''', (json_config, passed, failed))
+
+    # Check that we have the expected number of configs already, or nothing
+    cur.execute("SELECT COUNT(*) FROM TestResults")
+    count = cur.fetchone()[0]
+    if count == 0:
+        for d in range(max_drops+1):
+            for c in range(max_corruptions+1):
+                if d == 0 and c == 0:
+                    continue
+                
+                for i in range(200):
+                    insert_config(random_config(args.scope, d, c))
+    elif count == 1600:
+        print("Already have all configs in results table, skipping generation")
+    else:
+        print("Error: results table is partially populated")
+        sys.exit(1)
+    
+    while True:
+        cur.execute("select COUNT(*) FROM TestResults WHERE pass = 0 AND fail < 5")
+        if cur.fetchone()[0] > 0:
+            deflake_one(cur, args)
+        else:
+            break
+
+    print("Done!")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--scope", choices=["any", "small"], required=True)
@@ -207,6 +250,9 @@ if __name__ == "__main__":
     parser_fuzz_deflake.add_argument("--corruptions", type=int, default=0)
     parser_fuzz_deflake.add_argument("--max-drops", type=int)
     parser_fuzz_deflake.add_argument("--max-corruptions", type=int)
+
+    parser_reproduce = subparsers.add_parser("reproduce")
+    parser_reproduce.set_defaults(func=reproduce)
 
     args = parser.parse_args()
     args.func(args)

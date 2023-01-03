@@ -93,3 +93,10 @@ grep -r diff-commits baseline_logs/ logs_any_scope/ logs_small_scope/
 ```
 
 With our test setup, we have not detected any *validity*, *integrity* or *agreement*, so you should expect this to return no results.
+
+## Adding new corruption types
+If you wish to extend this codebase and add new types of structural corruptions, follow these steps:
+1. In `data.py`: add your new corruption type to the `CorruptionType` enum.
+2. In `data.py`: add the new enum variant to one of `ALL_PROPOSAL_CORRUPTION_TYPES`, `ALL_PROPOSAL_CORRUPTION_TYPES_ANY_SCOPE`, `ALL_VOTE_CORRUPTION_TYPES` or `ALL_VOTE_CORRUPTION_TYPES_ANY_SCOPE`.
+3. In `byzzfuzz/instance.go`: put the new corruption type with the same value as the python version.
+4. In `byzzfuzz/corruption.go`: add a case to the `Action` function on `MessageCorruption` to apply the new mutation. 

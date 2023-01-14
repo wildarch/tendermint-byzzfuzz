@@ -1,9 +1,9 @@
 # Getting started
 ## Requirements
-- Golang 1.18
-- Docker
+- Golang 1.18 (or newer). See https://go.dev/doc/install.
+- Docker. See https://docs.docker.com/engine/install/.
 - [docker-compose](https://pypi.org/project/docker-compose/). Not the one built-in to recent versions of docker. I found pip to be the easiest way to install it: `pip3 install --user docker-compose`.
-- SQLite
+- SQLite. On Debian-based distributions you can install it using `sudo apt install sqlite3`.
 
 ## Setup
 Some setup is required to prepare the modified Tendermint codebase.
@@ -18,6 +18,16 @@ cd third_party/tendermint-pct-instrumentation
 make build-linux
 # Build tendermint/localnode image
 make build-docker-localnode
+```
+
+The docker containers will need to be able to communicate with the orchestration server on the host.
+This requires IP forwarding, which is blocked by default on many Linux distributions.
+To enable it, follow the instructions at https://docs.docker.com/network/bridge/#enable-forwarding-from-docker-containers-to-the-outside-world.
+In short, before running any of the tests, execute the following commands (requires sudo):
+
+```
+sudo sysctl net.ipv4.conf.all.forwarding=1
+sudo iptables -P FORWARD ACCEPT
 ```
 
 ## Quick tests
@@ -94,9 +104,22 @@ grep -r diff-commits baseline_logs/ logs_any_scope/ logs_small_scope/
 
 With our test setup, we have not detected any *validity*, *integrity* or *agreement*, so you should expect this to return no results.
 
-## Adding new corruption types
+## Extending the implementation
+### Changing the configuration for fuzz/deflake:
+
+The fuzz and deflake subcommand on `orchestrate.py` accept parameters to change the scope, number of drops and number of corruptions.
+Rather than fixing the number of drops or corruptions, you may also pass a maximum amount, and the implementation will randomly sample a number from that range.
+For all options, run `./orchestrate.py --help`.
+
+### Visually inspecting event logs:
+Event logs can be lengthy and difficult to grasp.
+We provide a `diagram.py` script to visualize the events from a log file.
+Usage: `./diagram.py logs_small_scope/events000101_pass.log`
+
+### Adding new corruption types
 If you wish to extend this codebase and add new types of structural corruptions, follow these steps:
 1. In `data.py`: add your new corruption type to the `CorruptionType` enum.
 2. In `data.py`: add the new enum variant to one of `ALL_PROPOSAL_CORRUPTION_TYPES`, `ALL_PROPOSAL_CORRUPTION_TYPES_ANY_SCOPE`, `ALL_VOTE_CORRUPTION_TYPES` or `ALL_VOTE_CORRUPTION_TYPES_ANY_SCOPE`.
 3. In `byzzfuzz/instance.go`: put the new corruption type with the same value as the python version.
 4. In `byzzfuzz/corruption.go`: add a case to the `Action` function on `MessageCorruption` to apply the new mutation. 
+

@@ -240,13 +240,13 @@ def quick_tests(args):
     # Alternate between pass and fail tests.
     # Repeat the cycle once because the very first run starts from a clean env.
     for i in range(2):
-        print("expect PASS")
-        events = run_instance(pass_config)
-        assert(check_ok(events))
-
         print("expect FAIL")
         events = run_instance(fail_config)
         assert(not check_ok(events))
+
+        print("expect PASS")
+        events = run_instance(pass_config)
+        assert(check_ok(events))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
